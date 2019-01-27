@@ -20,6 +20,10 @@ var (
 	host       = kingpin.Flag("host", "Influxdb server hostname").Default("localhost").Short('h').String()
 	interval       = kingpin.Flag("interval", "Interval to export the data").Default("15").Short('i').Int16()
 
+  enableProm = kingpin.Flag("prometheus","Enable prometheus exporting").Default("false").Bool()
+  promPort = kingpin.Flag("promport","Port on which the prometheus exporter runs").Default("9601").Short('P').Int16()
+  enableInflux = kingpin.Flag("influx","Enable influx exporting").Default("true").Short('I').Bool()
+
   interf   = kingpin.Arg("network interface", "interface for which the exporter runs").Required().String()
 )
 
@@ -33,27 +37,42 @@ func main() {
 	customFormatter.FullTimestamp = true
 	logrus.SetFormatter(customFormatter)
 
-	// Create Influxdb client
-	dbclient, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     fmt.Sprintf("http://%s:%d", *host, *port),
-		Username: *username,
-		Password: *password,
-	})
-	if err != nil {
-    logrus.Fatalf("something went wrong with the influx connection: %v\n", err)
-	}
-  logrus.Infoln("influx client started")
-
   ticker := time.NewTicker(time.Duration(*interval) * time.Second)
+  if *enableProm{
+    logrus.Infoln("prometheus exporter enabled")
+  }
+
+  // Create Influxdb client
+  dbclient, err := client.NewHTTPClient(client.HTTPConfig{
+    Addr:     fmt.Sprintf("http://%s:%d", *host, *port),
+    Username: *username,
+    Password: *password,
+  })
+  if err != nil {
+    logrus.Fatalf("something went wrong with the influxdb connection: %v\n", err)
+  }
+  logrus.Infoln("influxdb client started")
+
+  if *enableProm{
+    go PromExporter(fmt.Sprintf(":%d", *promPort))
+  }
+
   for range ticker.C {
     link, qdiscs, classes := GetData(*interf)
-    go WriteLink(dbclient, *database, link)
-    go func(){
-      WriteQdisc(dbclient, *database, &qdiscs)
-    }()
-    go func(){
-      WriteClass(dbclient, *database, &classes)
-    }()
+    if *enableProm{
+      logrus.Infoln("starting prometheus export")
+      go HandleProm(&link, &qdiscs, &classes)
+    }
+    if *enableInflux {
+      logrus.Infoln("starting influxdb export")
+      go WriteLink(dbclient, *database, link)
+      go func(){
+        WriteQdisc(dbclient, *database, &qdiscs)
+      }()
+      go func(){
+        WriteClass(dbclient, *database, &classes)
+      }()
+    }
     logrus.Infoln("scrape completed")
   }
 }
