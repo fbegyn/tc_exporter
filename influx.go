@@ -79,9 +79,9 @@ func WriteQdisc(dbclient client.Client, db string, qdiscs *[]netlink.Qdisc) {
         fields["default"] = qd.Defcls
       case "fq_codel":
         qd := q.(*netlink.FqCodel)
-        fields["target"] = qd.Target
+        fields["target"] = qd.Target+1
         fields["limit"] = qd.Limit
-        fields["interval"] = qd.Interval
+        fields["interval"] = qd.Interval+1
         fields["ecn"] = qd.ECN
         fields["flows"] = qd.Flows
         fields["quantum"] = qd.Quantum
@@ -117,7 +117,7 @@ func WriteClass(dbclient client.Client, db string, classes *[]netlink.Class) {
       "type": c.Type(),
       "handle": netlink.HandleStr(c.Attrs().Handle),
       "parent": netlink.HandleStr(c.Attrs().Parent),
-      "leaf": strconv.FormatUint(uint64(c.Attrs().Leaf), 10),
+      "leaf": netlink.HandleStr(c.Attrs().Leaf),
     }
 
     fields := map[string]interface{}{
