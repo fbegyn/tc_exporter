@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/vishvananda/netlink"
 	"github.com/sirupsen/logrus"
+	"github.com/vishvananda/netlink"
 )
 
 // rates stores the calculated rates for ease of access
 type rates struct {
-  MaxRate uint32 `json:"maxrate"`
-  RateC1  uint32 `json:"ratec1"`
+	MaxRate uint32 `json:"maxrate"`
+	RateC1  uint32 `json:"ratec1"`
 	RateC2  uint32 `json:"ratec2"`
 	RateC11 uint32 `json:"ratec11"`
 	RateC12 uint32 `json:"ratec12"`
