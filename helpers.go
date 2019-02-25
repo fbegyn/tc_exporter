@@ -76,6 +76,15 @@ func GetData(index string) (link netlink.Link, qdiscs []netlink.Qdisc, classes [
 	return
 }
 
+func FilterClass(classes *[]netlink.Class, filt string) (ret []netlink.Class) {
+	for _, cl := range *classes {
+		if cl.Type() == filt {
+			ret = append(ret, cl)
+		}
+	}
+	return
+}
+
 // CalcRates calculates the rates base don a maximum internet speed
 func CalcRates(maxRate float64) (r rates) {
 	ethRate := 1e9

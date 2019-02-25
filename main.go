@@ -63,6 +63,7 @@ func main() {
 	for range ticker.C {
 		for _, interf := range links {
 			link, qdiscs, classes := GetData(interf)
+			classes = FilterClass(&classes, "hfsc")
 			if *enableProm {
 				logrus.Infoln("starting prometheus export")
 				go HandleProm(&link, &qdiscs, &classes)
