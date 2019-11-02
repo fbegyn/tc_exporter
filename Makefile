@@ -1,3 +1,5 @@
+prefix = /usr/sbin
+
 all: build
 
 build:
@@ -6,8 +8,12 @@ build:
 clean:
 	rm -rf bin/tc_exporter
 
-install:
-	cp bin/tc_exporter /usr/sbin/tc_exporter
+install: build
+	install -D bin/tc_exporter $(DESTDIR)$(prefix)/tc_exporter
+	install -D tc_exporter@.service $(DESTDIR)/etc/systemd/system/tc_exporter@.service
+	systemctl daemon-reload
 
 uninstall:
-	rm /usr/sbin/tc_exporter
+	rm $(DESTDIR)$(prefix)/tc_exporter
+	rm $(DESTDIR)/etc/systemd/system/tc_exporter@.service
+	systemctl daemon-reload
