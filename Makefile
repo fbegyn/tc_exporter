@@ -15,8 +15,7 @@ test:
 
 clean:
 	$(GOCLEAN)
-	rm -f build/$(BINARY_NAME)
-	rm -f build/$(BINARY_UNIX)
+	rm -rf build/*
 
 run:
 	$(GOBUILD) -o $(BINARY_NAME) -v ./...
