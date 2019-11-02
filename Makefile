@@ -1,27 +1,13 @@
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-BINARY_NAME=tc_exporter
-
 all: build
 
 build:
-	$(GOBUILD) -ldflags "-s -w" -o build/$(BINARY_NAME) -v
-
-test:
-	$(GOTEST) -v ./...
+	go build -o bin/tc_exporter -ldflags "-w -s"
 
 clean:
-	$(GOCLEAN)
-	rm -f build/$(BINARY_NAME)
-	rm -f build/$(BINARY_UNIX)
+	rm -rf bin/tc_exporter
 
-run:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./...
-	./$(BINARY_NAME)
+install:
+	cp bin/tc_exporter /usr/sbin/tc_exporter
 
-deps:
-	$(GOGET) github.com/markbates/goth
-	$(GOGET) github.com/markbates/pop
+uninstall:
+	rm /usr/sbin/tc_exporter
