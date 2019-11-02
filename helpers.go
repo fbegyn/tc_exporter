@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	netlink "github.com/fbegyn/netlink-vishv"
 	"github.com/sirupsen/logrus"
-	"github.com/vishvananda/netlink"
 )
 
 // rates stores the calculated rates for ease of access
