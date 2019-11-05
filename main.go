@@ -10,10 +10,6 @@ import (
 )
 
 var (
-	systemLink string
-)
-
-var (
 	username = kingpin.Flag("user", "Username for influxdb").Default("admin").Short('u').String()
 	password = kingpin.Flag("password", "Password for influxdb").Default("admin").Short('k').String()
 	database = kingpin.Flag("database", "Influxdb database to use").Default("netlink").Short('d').String()
