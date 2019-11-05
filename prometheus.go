@@ -57,7 +57,7 @@ var (
 	fqcodelECN = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_ecn",
-			Help: "Can be used to mark packets instead of dropping them<Paste>",
+			Help: "Can be used to mark packets instead of dropping them",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
@@ -141,7 +141,7 @@ var (
 	hfscSC = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_hfsc_sc",
-			Help: "Service curve for the fhsc class,",
+			Help: "Service curve for the hfsc class",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf", "sc", "param"},
 	)
@@ -169,12 +169,14 @@ func init() {
 	prometheus.MustRegister(hfscSC)
 }
 
+// HandleProm registers all prometheus metrics
 func HandleProm(link *netlink.Link, qdiscs *[]netlink.Qdisc, classes *[]netlink.Class) {
 	go registerLink(*link)
 	go registerQdiscs(qdiscs)
 	go registerClasses(classes)
 }
 
+// PromExporter starts the prometheus exporter listener on the provided port
 func PromExporter(port string) {
 	logrus.Infoln("Starting prometheus exporter on http://localhost:9601/metrics")
 	http.Handle("/metrics", promhttp.Handler())
@@ -205,22 +207,22 @@ func registerQdisc(q netlink.Qdisc) {
 		logrus.Errorf("couldn't get host name: %v\n", err)
 	}
 	linkindex := strconv.Itoa(q.Attrs().LinkIndex)
-	typ := q.Type()
+	qdiscType := q.Type()
 	handle := netlink.HandleStr(q.Attrs().Handle)
 	parent := netlink.HandleStr(q.Attrs().Parent)
-	qdiscRefcnt.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(q.Attrs().Refcnt))
-	switch typ {
+	qdiscRefcnt.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(q.Attrs().Refcnt))
+	switch qdiscType {
 	case "hfsc":
 		qd := q.(*netlink.Hfsc)
-		hfscDefault.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.Defcls))
+		hfscDefault.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Defcls))
 	case "fq_codel":
 		qd := q.(*netlink.FqCodel)
-		fqcodelTarget.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.Target + 1))
-		fqcodelLimit.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.Limit))
-		fqcodelInterval.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.Interval + 1))
-		fqcodelECN.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.ECN))
-		fqcodelFlows.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.Flows))
-		fqcodelQuantum.WithLabelValues(host, linkindex, typ, handle, parent).Set(float64(qd.Quantum))
+		fqcodelTarget.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Target + 1))
+		fqcodelLimit.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Limit))
+		fqcodelInterval.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Interval + 1))
+		fqcodelECN.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.ECN))
+		fqcodelFlows.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Flows))
+		fqcodelQuantum.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Quantum))
 	}
 }
 
@@ -236,33 +238,33 @@ func registerClass(c netlink.Class) {
 		logrus.Errorf("couldn't get host name: %v\n", err)
 	}
 	linkindex := strconv.Itoa(c.Attrs().LinkIndex)
-	typ := c.Type()
+	classType := c.Type()
 	handle := netlink.HandleStr(c.Attrs().Handle)
 	parent := netlink.HandleStr(c.Attrs().Parent)
 	leaf := netlink.HandleStr(c.Attrs().Leaf)
-	classBytes.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Basic.Bytes))
-	classPackets.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Basic.Packets))
-	classBacklog.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Backlog))
-	classDrops.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Drops))
-	classOverlimits.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Overlimits))
-	classRequeues.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Requeues))
-	classQlen.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Qlen))
-	classBps.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.RateEst.Bps))
-	classPps.WithLabelValues(host, linkindex, typ, handle, parent, leaf).Set(float64(c.Attrs().Statistics.RateEst.Pps))
-	switch typ {
+	classBytes.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Basic.Bytes))
+	classPackets.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Basic.Packets))
+	classBacklog.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Backlog))
+	classDrops.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Drops))
+	classOverlimits.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Overlimits))
+	classRequeues.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Requeues))
+	classQlen.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.Queue.Qlen))
+	classBps.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.RateEst.Bps))
+	classPps.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.RateEst.Pps))
+	switch classType {
 	case "hfsc":
 		cd := c.(*netlink.HfscClass)
 		Fburst, Fdelay, Frate := cd.Fsc.Attrs()
 		Uburst, Udelay, Urate := cd.Usc.Attrs()
 		Rburst, Rdelay, Rrate := cd.Rsc.Attrs()
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "fsc", "burst").Set(float64(Fburst))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "fsc", "delay").Set(float64(Fdelay))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "fsc", "rate").Set(float64(Frate))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "rsc", "burst").Set(float64(Rburst))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "rsc", "delay").Set(float64(Rdelay))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "rsc", "rate").Set(float64(Rrate))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "usc", "burst").Set(float64(Uburst))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "usc", "delay").Set(float64(Udelay))
-		hfscSC.WithLabelValues(host, linkindex, typ, handle, parent, leaf, "usc", "rate").Set(float64(Urate))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "fsc", "burst").Set(float64(Fburst))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "fsc", "delay").Set(float64(Fdelay))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "fsc", "rate").Set(float64(Frate))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "rsc", "burst").Set(float64(Rburst))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "rsc", "delay").Set(float64(Rdelay))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "rsc", "rate").Set(float64(Rrate))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "usc", "burst").Set(float64(Uburst))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "usc", "delay").Set(float64(Udelay))
+		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "usc", "rate").Set(float64(Urate))
 	}
 }
