@@ -15,7 +15,7 @@ var (
 	operstatus = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_link_operstatus",
-			Help: "Operational status of the link",
+			Help: "Operational status of the link from IFLA_OPERSTATE numeric representation of RFC2863",
 		},
 		[]string{"host", "name", "type", "hwaddr"},
 	)
@@ -188,11 +188,9 @@ func registerLink(l netlink.Link) {
 	if err != nil {
 		logrus.Errorf("couldn't get host name: %v\n", err)
 	}
-	if l.Attrs().OperState.String() == "up" {
-		operstatus.WithLabelValues(host, l.Attrs().Name, l.Type(), l.Attrs().HardwareAddr.String()).Set(1)
-	} else {
-		operstatus.WithLabelValues(host, l.Attrs().Name, l.Type(), l.Attrs().HardwareAddr.String()).Set(0)
-	}
+
+	// set operstatus according to https://tools.ietf.org/html/rfc2863#section-3.1.12
+	operstatus.WithLabelValues(host, l.Attrs().Name, l.Type(), l.Attrs().HardwareAddr.String()).Set(float64(l.Attrs().OperState))
 }
 
 func registerQdiscs(qdiscs *[]netlink.Qdisc) {
