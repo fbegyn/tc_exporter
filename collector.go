@@ -7,138 +7,139 @@ import (
 
 	netlink "github.com/fbegyn/netlink-vishv"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	operstatus = prometheus.NewGaugeVec(
+	operstatus = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_link_operstatus",
 			Help: "Operational status of the link from IFLA_OPERSTATE numeric representation of RFC2863",
 		},
 		[]string{"host", "name", "type", "hwaddr"},
 	)
-	qdiscRefcnt = prometheus.NewGaugeVec(
+	qdiscRefcnt = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_refcnt",
 			Help: "Qdisc refcount",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	hfscDefault = prometheus.NewGaugeVec(
+	hfscDefault = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_hfsc_default",
 			Help: "Default class id for the HFSC qdisc",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	fqcodelTarget = prometheus.NewGaugeVec(
+	fqcodelTarget = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_target",
 			Help: "The acceptable minimum standing/persistent queue delay",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	fqcodelLimit = prometheus.NewGaugeVec(
+	fqcodelLimit = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_limit",
 			Help: "The hard limit on the real queue size",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	fqcodelInterval = prometheus.NewGaugeVec(
+	fqcodelInterval = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_interval",
 			Help: "Used to ensure that the measured minimum delay does not become too stale",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	fqcodelECN = prometheus.NewGaugeVec(
+	fqcodelECN = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_ecn",
 			Help: "Can be used to mark packets instead of dropping them",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	fqcodelFlows = prometheus.NewGaugeVec(
+	fqcodelFlows = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_flows",
 			Help: "The number of flows into which the incoming packets are classified",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	fqcodelQuantum = prometheus.NewGaugeVec(
+	fqcodelQuantum = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_qdisc_fqcodel_quantum",
 			Help: "The number of bytes used as 'deficit' in the fair queuing algorithm",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent"},
 	)
-	classBytes = prometheus.NewGaugeVec(
+	classBytes = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_bytes",
 			Help: "Sent bytes",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classPackets = prometheus.NewGaugeVec(
+	classPackets = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_packets",
 			Help: "Sent packets",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classBacklog = prometheus.NewGaugeVec(
+	classBacklog = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_backlog",
 			Help: "Packets in backlog",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classDrops = prometheus.NewGaugeVec(
+	classDrops = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_drops",
 			Help: "Dropped packets",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classOverlimits = prometheus.NewGaugeVec(
+	classOverlimits = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_overlimits",
 			Help: "Overlimit packets",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classRequeues = prometheus.NewGaugeVec(
+	classRequeues = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_requeues",
 			Help: "Requeue packets",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classQlen = prometheus.NewGaugeVec(
+	classQlen = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_qlen",
 			Help: "Packets in qlen",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classBps = prometheus.NewGaugeVec(
+	classBps = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_bps",
 			Help: "Bytes per second",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	classPps = prometheus.NewGaugeVec(
+	classPps = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_pps",
 			Help: "Packets per second",
 		},
 		[]string{"host", "linkindex", "type", "handle", "parent", "leaf"},
 	)
-	hfscSC = prometheus.NewGaugeVec(
+	hfscSC = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "tc_class_hfsc_sc",
 			Help: "Service curve for the hfsc class",
@@ -147,43 +148,76 @@ var (
 	)
 )
 
-func init() {
-	prometheus.MustRegister(operstatus)
-	prometheus.MustRegister(qdiscRefcnt)
-	prometheus.MustRegister(hfscDefault)
-	prometheus.MustRegister(fqcodelTarget)
-	prometheus.MustRegister(fqcodelLimit)
-	prometheus.MustRegister(fqcodelQuantum)
-	prometheus.MustRegister(fqcodelFlows)
-	prometheus.MustRegister(fqcodelECN)
-	prometheus.MustRegister(fqcodelInterval)
-	prometheus.MustRegister(classBytes)
-	prometheus.MustRegister(classPackets)
-	prometheus.MustRegister(classBacklog)
-	prometheus.MustRegister(classDrops)
-	prometheus.MustRegister(classOverlimits)
-	prometheus.MustRegister(classRequeues)
-	prometheus.MustRegister(classQlen)
-	prometheus.MustRegister(classBps)
-	prometheus.MustRegister(classPps)
-	prometheus.MustRegister(hfscSC)
-}
-
-// HandleProm registers all prometheus metrics
-func HandleProm(link *netlink.Link, qdiscs *[]netlink.Qdisc, classes *[]netlink.Class) {
-	go registerLink(*link)
-	go registerQdiscs(qdiscs)
-	go registerClasses(classes)
-}
-
 // PromExporter starts the prometheus exporter listener on the provided port
-func PromExporter(port string) {
-	logrus.Infoln("Starting prometheus exporter on http://localhost:9601/metrics")
-	http.Handle("/metrics", promhttp.Handler())
-	logrus.Fatal(http.ListenAndServe(port, nil))
+func PromExporter() {
+	http.Handle("/app", promhttp.Handler())
+	http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		// Fetch the url encoded interface
+		logrus.Infof("received request to scrape all interfaces\n")
+
+		register := prometheus.NewRegistry()
+		interfaces, err := netlink.LinkList()
+		if err != nil {
+			logrus.Fatalf("failed to scrape all interfaces\n")
+		}
+		// Create the register for the data
+		exporter := NewTcExporer(interfaces)
+		register.MustRegister(exporter)
+
+		h := promhttp.HandlerFor(register, promhttp.HandlerOpts{})
+		h.ServeHTTP(w, r)
+	})
 }
 
-func registerLink(l netlink.Link) {
+type TcExporter struct {
+	interf []netlink.Link
+}
+
+func NewTcExporer(links []netlink.Link) *TcExporter {
+	return &TcExporter{
+		interf: links,
+	}
+}
+
+func (c *TcExporter) Describe(ch chan<- *prometheus.Desc) {
+	ch <- prometheus.NewDesc("dummy", "dummy", nil, nil)
+}
+
+func (c *TcExporter) Collect(ch chan<- prometheus.Metric) {
+	// Fetch the required data for the exporter
+	for _, link := range c.interf {
+		data := GetData(link)
+		collectLink(data.link)
+		collectQdiscs(data.qdiscs)
+		collectClasses(data.classes)
+	}
+
+	// Collect all the statistics
+	// Register link stats
+	operstatus.Collect(ch)
+	// Register qdisc stats
+	qdiscRefcnt.Collect(ch)
+	hfscDefault.Collect(ch)
+	fqcodelECN.Collect(ch)
+	fqcodelFlows.Collect(ch)
+	fqcodelInterval.Collect(ch)
+	fqcodelLimit.Collect(ch)
+	fqcodelQuantum.Collect(ch)
+	fqcodelTarget.Collect(ch)
+	// Regsiter class stats
+	classBacklog.Collect(ch)
+	classBps.Collect(ch)
+	classBytes.Collect(ch)
+	classDrops.Collect(ch)
+	classOverlimits.Collect(ch)
+	classPackets.Collect(ch)
+	classPps.Collect(ch)
+	classQlen.Collect(ch)
+	classRequeues.Collect(ch)
+	hfscSC.Collect(ch)
+}
+
+func collectLink(l netlink.Link) {
 	host, err := os.Hostname()
 	if err != nil {
 		logrus.Errorf("couldn't get host name: %v\n", err)
@@ -193,13 +227,13 @@ func registerLink(l netlink.Link) {
 	operstatus.WithLabelValues(host, l.Attrs().Name, l.Type(), l.Attrs().HardwareAddr.String()).Set(float64(l.Attrs().OperState))
 }
 
-func registerQdiscs(qdiscs *[]netlink.Qdisc) {
+func collectQdiscs(qdiscs *[]netlink.Qdisc) {
 	for _, q := range *qdiscs {
-		registerQdisc(q)
+		collectQdisc(q)
 	}
 }
 
-func registerQdisc(q netlink.Qdisc) {
+func collectQdisc(q netlink.Qdisc) {
 	host, err := os.Hostname()
 	if err != nil {
 		logrus.Errorf("couldn't get host name: %v\n", err)
@@ -211,26 +245,26 @@ func registerQdisc(q netlink.Qdisc) {
 	qdiscRefcnt.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(q.Attrs().Refcnt))
 	switch qdiscType {
 	case "hfsc":
-		qd := q.(*netlink.Hfsc)
-		hfscDefault.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Defcls))
+		hfscQdisc := q.(*netlink.Hfsc)
+		hfscDefault.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(hfscQdisc.Defcls))
 	case "fq_codel":
-		qd := q.(*netlink.FqCodel)
-		fqcodelTarget.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Target + 1))
-		fqcodelLimit.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Limit))
-		fqcodelInterval.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Interval + 1))
-		fqcodelECN.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.ECN))
-		fqcodelFlows.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Flows))
-		fqcodelQuantum.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(qd.Quantum))
+		fqcodelQdisc := q.(*netlink.FqCodel)
+		fqcodelTarget.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(fqcodelQdisc.Target + 1))
+		fqcodelLimit.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(fqcodelQdisc.Limit))
+		fqcodelInterval.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(fqcodelQdisc.Interval + 1))
+		fqcodelECN.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(fqcodelQdisc.ECN))
+		fqcodelFlows.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(fqcodelQdisc.Flows))
+		fqcodelQuantum.WithLabelValues(host, linkindex, qdiscType, handle, parent).Set(float64(fqcodelQdisc.Quantum))
 	}
 }
 
-func registerClasses(classes *[]netlink.Class) {
+func collectClasses(classes *[]netlink.Class) {
 	for _, c := range *classes {
-		registerClass(c)
+		collectClass(c)
 	}
 }
 
-func registerClass(c netlink.Class) {
+func collectClass(c netlink.Class) {
 	host, err := os.Hostname()
 	if err != nil {
 		logrus.Errorf("couldn't get host name: %v\n", err)
@@ -251,10 +285,10 @@ func registerClass(c netlink.Class) {
 	classPps.WithLabelValues(host, linkindex, classType, handle, parent, leaf).Set(float64(c.Attrs().Statistics.RateEst.Pps))
 	switch classType {
 	case "hfsc":
-		cd := c.(*netlink.HfscClass)
-		Fburst, Fdelay, Frate := cd.Fsc.Attrs()
-		Uburst, Udelay, Urate := cd.Usc.Attrs()
-		Rburst, Rdelay, Rrate := cd.Rsc.Attrs()
+		hfscClass := c.(*netlink.HfscClass)
+		Fburst, Fdelay, Frate := hfscClass.Fsc.Attrs()
+		Uburst, Udelay, Urate := hfscClass.Usc.Attrs()
+		Rburst, Rdelay, Rrate := hfscClass.Rsc.Attrs()
 		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "fsc", "burst").Set(float64(Fburst))
 		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "fsc", "delay").Set(float64(Fdelay))
 		hfscSC.WithLabelValues(host, linkindex, classType, handle, parent, leaf, "fsc", "rate").Set(float64(Frate))
