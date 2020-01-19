@@ -1,0 +1,11 @@
+[Unit]
+Description=Prometheus tc_exporter for tc data
+
+[Service]
+ExecStart=/usr/local/bin/tc_exporter
+Restart=always
+RestartSec=30
+Type=simple
+
+[Install]
+WantedBy=default.target
