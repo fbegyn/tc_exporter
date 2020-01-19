@@ -10,13 +10,6 @@ import (
 )
 
 var (
-	// username = kingpin.Flag("user", "Username for influxdb").Default("admin").Short('u').String()
-	// password = kingpin.Flag("password", "Password for influxdb").Default("admin").Short('k').String()
-	// database = kingpin.Flag("database", "Influxdb database to use").Default("netlink").Short('d').String()
-	// port     = kingpin.Flag("port", "Influxdb data port").Default("8086").Short('p').Int16()
-	// host     = kingpin.Flag("host", "Influxdb server hostname").Default("localhost").Short('h').String()
-	// interval = kingpin.Flag("interval", "Interval to export the data").Default("15").Short('i').Int16()
-
 	// enableProm = kingpin.Flag("prometheus", "Enable prometheus exporting").Default("true").Bool()
 	promPort = kingpin.Flag("promport", "Port on which the prometheus exporter runs").Default("9601").Short('P').String()
 	// enableInflux = kingpin.Flag("influx", "Enable influx exporting").Default("false").Short('I').Bool()
