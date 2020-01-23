@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	netlink "github.com/fbegyn/netlink-vishv"
