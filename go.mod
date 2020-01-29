@@ -10,6 +10,7 @@ require (
 	github.com/prometheus/client_golang v1.3.0
 	github.com/prometheus/common v0.7.0
 	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/viper v1.6.2
 	github.com/vishvananda/netlink v1.0.1-0.20190930145447-2ec5bdc52b86 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6

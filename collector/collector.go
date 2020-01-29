@@ -38,21 +38,33 @@ type TcCollector struct {
 	Collectors map[string]Collector
 }
 
-func NewTcCollector() (*TcCollector, error) {
+func NewTcCollector(interfaces []string) (*TcCollector, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		return nil, err
 	}
+
 	collectors := make(map[string]Collector)
 	for _, link := range links {
 		name := link.Attrs().Name
-		dc, err := NewDataCollector(link)
-		if err != nil {
-			return nil, err
+		if checkArray(name, interfaces) {
+			dc, err := NewDataCollector(link)
+			if err != nil {
+				return nil, err
+			}
+			collectors[name] = dc
 		}
-		collectors[name] = dc
 	}
 	return &TcCollector{collectors}, nil
+}
+
+func checkArray(str1 string, str2 []string) bool {
+	for _, a := range str2 {
+		if a == str1 {
+			return true
+		}
+	}
+	return false
 }
 
 func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {

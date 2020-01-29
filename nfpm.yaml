@@ -1,8 +1,7 @@
-# nfpm example config file
 name: "tc-exporter"
 arch: "amd64"
 platform: "linux"
-version: "v0.2.0"
+version: "v0.4.0"
 section: "default"
 priority: "extra"
 maintainer: "Francis Begyn <francis@begyn.be>"
