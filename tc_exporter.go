@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/version"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -15,12 +16,14 @@ type handler struct {
 	unfilteredHandler       http.Handler
 	exporterMetricsRegistry *prometheus.Registry
 	maxRequests             int
+	interfaces              []string
 }
 
-func newHandler(maxRequests int) *handler {
+func newHandler(maxRequests int, interfaces []string) *handler {
 	h := &handler{
 		exporterMetricsRegistry: prometheus.NewRegistry(),
 		maxRequests:             maxRequests,
+		interfaces:              interfaces,
 	}
 	if innerHandler, err := h.innerHandler(); err != nil {
 		logrus.Fatalf("Couldn't create metrics handler: %s", err)
@@ -39,7 +42,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) innerHandler() (http.Handler, error) {
-	tc, err := collector.NewTcCollector()
+	tc, err := collector.NewTcCollector(h.interfaces)
 	if err != nil {
 		logrus.Errorf("failed to create collector: %v", err)
 		return nil, err
@@ -71,6 +74,19 @@ func main() {
 	kingpin.Version("v0.1.8")
 	kingpin.Parse()
 
+	viper.SetConfigName("config")
+	viper.SetConfigType("toml")
+	viper.AddConfigPath("/etc/tc_exporter/")
+	viper.AddConfigPath("$HOME/.config/tc_exporter/")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			logrus.Infoln("no config file found, using defaults")
+		} else {
+			logrus.Fatalln("failed to read config file")
+		}
+	}
+
 	// Configuring the logging
 	customFormatter := new(logrus.TextFormatter)
 	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
@@ -79,7 +95,7 @@ func main() {
 
 	logrus.Infoln("prometheus exporter enabled")
 
-	http.Handle("/metrics", newHandler(100))
+	http.Handle("/metrics", newHandler(100, viper.GetStringSlice("interfaces")))
 
 	logrus.Fatal(http.ListenAndServe(":"+*promPort, nil))
 }
