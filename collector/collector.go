@@ -112,6 +112,16 @@ func NewDataCollector(link netlink.Link) (Collector, error) {
 	for _, qd := range *data.qdiscs {
 		var col Collector
 		switch qd.Type() {
+		case "fq_codel":
+			col, err = NewFqcodelQdiscCollector(qd, name)
+			if err != nil {
+				return nil, err
+			}
+		case "hfsc":
+			col, err = NewHfscQdiscCollector(qd, name)
+			if err != nil {
+				return nil, err
+			}
 		default:
 			col, err = NewGenericQdiscCollector(qd, name)
 			if err != nil {
@@ -125,6 +135,11 @@ func NewDataCollector(link netlink.Link) (Collector, error) {
 	for _, cl := range *data.classes {
 		var col Collector
 		switch cl.Type() {
+		case "hfsc":
+			col, err = NewHfscClassCollector(cl, name)
+			if err != nil {
+				return nil, err
+			}
 		default:
 			col, err = NewGenericClassCollector(cl, name)
 			if err != nil {
