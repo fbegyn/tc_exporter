@@ -28,7 +28,8 @@ func GetData(link netlink.Link) (data NetlinkData) {
 	if err != nil {
 		logrus.Fatalf("Failed to fetch classes: %v.", err)
 	}
-	data.classes = &classes
+	filteredClasses := FilterClass(&classes, "hfsc")
+	data.classes = &filteredClasses
 	return
 }
 
