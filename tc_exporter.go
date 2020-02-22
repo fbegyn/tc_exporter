@@ -71,7 +71,7 @@ func main() {
 		promPort = kingpin.Flag("promport", "Port on which the prometheus exporter runs").Default("9601").Short('P').String()
 	)
 	// CLI arguments parsing
-	kingpin.Version("v0.1.8")
+	kingpin.Version("v0.4.3")
 	kingpin.Parse()
 
 	viper.SetConfigName("config")
