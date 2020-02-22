@@ -6,20 +6,12 @@ import (
 
 	netlink "github.com/fbegyn/netlink-vishv"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 )
 
 const namespace = "tc"
 
 var (
-	hfscSC = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "tc_class_hfsc_sc",
-			Help: "Service curve for the hfsc class",
-		},
-		[]string{"host", "linkindex", "type", "handle", "parent", "leaf", "sc", "param"},
-	)
 	scrapeDurationDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "scrape", "collector_duration_seconds"),
 		"node_exporter: Duration of a collector scrape.",

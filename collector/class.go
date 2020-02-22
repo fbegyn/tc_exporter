@@ -11,6 +11,7 @@ import (
 
 var (
 	classlabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent", "leaf"}
+	curvelabels []string = []string{"host", "linkindex", "type", "handle", "parent", "leaf"}
 )
 
 // Collector for a generic Class
@@ -212,12 +213,20 @@ type hfscClassCollector struct {
 	qlen       *prometheus.Desc
 	bps        *prometheus.Desc
 	pps        *prometheus.Desc
+	fsc        Collector
+	usc        Collector
+	rsc        Collector
 }
 
 func NewHfscClassCollector(class netlink.Class, link string) (Collector, error) {
+	cl := class.(*netlink.HfscClass)
+	FSC, _ := newServiceCurveCollector(cl, cl.Fsc, "fsc")
+	RSC, _ := newServiceCurveCollector(cl, cl.Usc, "usc")
+	USC, _ := newServiceCurveCollector(cl, cl.Rsc, "rsc")
+
 	return &hfscClassCollector{
 		link:  link,
-		class: class.(*netlink.HfscClass),
+		class: cl,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "bytes"),
 			"Bytes passed though class",
@@ -263,6 +272,9 @@ func NewHfscClassCollector(class netlink.Class, link string) (Collector, error) 
 			"Class pps",
 			classlabels, nil,
 		),
+		fsc: FSC,
+		rsc: RSC,
+		usc: USC,
 	}, nil
 }
 
@@ -378,6 +390,88 @@ func (c *hfscClassCollector) Update(ch chan<- prometheus.Metric) error {
 		linkindex,
 		c.link,
 		c.class.Type(),
+		netlink.HandleStr(c.class.Attrs().Handle),
+		netlink.HandleStr(c.class.Attrs().Parent),
+		netlink.HandleStr(c.class.Attrs().Leaf),
+	)
+
+	c.rsc.Update(ch)
+	c.usc.Update(ch)
+	c.fsc.Update(ch)
+
+	return nil
+}
+
+type serviceCurveCollector struct {
+	sc    string
+	class *netlink.HfscClass
+	curve netlink.ServiceCurve
+	Burst *prometheus.Desc
+	Delay *prometheus.Desc
+	Rate  *prometheus.Desc
+}
+
+func newServiceCurveCollector(class *netlink.HfscClass, curve netlink.ServiceCurve, sc string) (Collector, error) {
+	return &serviceCurveCollector{
+		sc:    sc,
+		class: class,
+		curve: curve,
+		Burst: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "service_curve", "burst"),
+			"Burst parameter of the service curve",
+			curvelabels, nil,
+		),
+		Delay: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "service_curve", "delay"),
+			"Delay parameter of the service curve",
+			curvelabels, nil,
+		),
+		Rate: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "service_curve", "rate"),
+			"Rate parameter of the service curve",
+			curvelabels, nil,
+		),
+	}, nil
+}
+
+//curvelabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent", "leaf"}
+func (c *serviceCurveCollector) Update(ch chan<- prometheus.Metric) error {
+	host, err := os.Hostname()
+	if err != nil {
+		logrus.Errorf("couldn't get host name: %v\n", err)
+		return err
+	}
+	linkindex := strconv.Itoa(c.class.Attrs().LinkIndex)
+
+	ch <- prometheus.MustNewConstMetric(
+		c.Burst,
+		prometheus.GaugeValue,
+		float64(c.curve.Burst()),
+		host,
+		linkindex,
+		c.sc,
+		netlink.HandleStr(c.class.Attrs().Handle),
+		netlink.HandleStr(c.class.Attrs().Parent),
+		netlink.HandleStr(c.class.Attrs().Leaf),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		c.Delay,
+		prometheus.GaugeValue,
+		float64(c.curve.Delay()),
+		host,
+		linkindex,
+		c.sc,
+		netlink.HandleStr(c.class.Attrs().Handle),
+		netlink.HandleStr(c.class.Attrs().Parent),
+		netlink.HandleStr(c.class.Attrs().Leaf),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		c.Rate,
+		prometheus.GaugeValue,
+		float64(c.curve.Rate()),
+		host,
+		linkindex,
+		c.sc,
 		netlink.HandleStr(c.class.Attrs().Handle),
 		netlink.HandleStr(c.class.Attrs().Parent),
 		netlink.HandleStr(c.class.Attrs().Leaf),
