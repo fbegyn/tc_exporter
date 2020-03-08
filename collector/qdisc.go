@@ -1,10 +1,11 @@
 package collector
 
 import (
+	"fmt"
+	"net"
 	"os"
-	"strconv"
 
-	netlink "github.com/fbegyn/netlink-vishv"
+	"github.com/florianl/go-tc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
@@ -13,246 +14,165 @@ var (
 	qdisclabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent"}
 )
 
-// Collector for a generic Qdisc
-type genericQdiscCollector struct {
-	link   string
-	qdisc  *netlink.GenericQdisc
-	refcnt *prometheus.Desc
+type QdiscCollector struct {
+	interf     string
+	devID      uint32
+	qdisc      tc.Object
+	bytes      *prometheus.Desc
+	packets    *prometheus.Desc
+	bps        *prometheus.Desc
+	pps        *prometheus.Desc
+	backlog    *prometheus.Desc
+	drops      *prometheus.Desc
+	overlimits *prometheus.Desc
+	qlen       *prometheus.Desc
 }
 
-func NewGenericQdiscCollector(qdisc netlink.Qdisc, link string) (Collector, error) {
-	return &genericQdiscCollector{
-		link:  link,
-		qdisc: qdisc.(*netlink.GenericQdisc),
-		refcnt: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "refcnt"),
-			"Qdisc refcnt",
+func NewQdiscCollector(interf *net.Interface, qdisc tc.Object) (Collector, error) {
+	return &QdiscCollector{
+		interf: interf.Name,
+		devID:  uint32(interf.Index),
+		qdisc:  qdisc,
+		bytes: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "bytes"),
+			"Qdisc byte counter",
+			qdisclabels, nil,
+		),
+		packets: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "packets"),
+			"Qdisc packet counter",
+			qdisclabels, nil,
+		),
+		bps: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "bps"),
+			"Qdisc byte rate",
+			qdisclabels, nil,
+		),
+		pps: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "pps"),
+			"Qdisc packet rate",
+			qdisclabels, nil,
+		),
+		backlog: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "backlog"),
+			"Qdisc queue backlog",
+			qdisclabels, nil,
+		),
+		drops: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "drops"),
+			"Qdisc queue drops",
+			qdisclabels, nil,
+		),
+		overlimits: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "overlimits"),
+			"Qdisc queue overlimits",
+			qdisclabels, nil,
+		),
+		qlen: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "qdisc", "qlen"),
+			"Qdisc queue length",
 			qdisclabels, nil,
 		),
 	}, nil
 }
 
-func (c *genericQdiscCollector) Update(ch chan<- prometheus.Metric) error {
+func (qc *QdiscCollector) Update(ch chan<- prometheus.Metric) error {
 	host, err := os.Hostname()
 	if err != nil {
 		logrus.Errorf("couldn't get host name: %v\n", err)
 		return err
 	}
-	linkindex := strconv.Itoa(c.qdisc.Attrs().LinkIndex)
+
+	handleMaj, handleMin := HandleStr(qc.qdisc.Handle)
+	parentMin, parentMaj := HandleStr(qc.qdisc.Parent)
 
 	ch <- prometheus.MustNewConstMetric(
-		c.refcnt,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Attrs().Refcnt),
+		qc.bytes,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Bytes),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
-	)
-	return nil
-}
-
-// collector for a HFSC qdisc
-type hfscQdiscCollector struct {
-	link   string
-	qdisc  *netlink.Hfsc
-	refcnt *prometheus.Desc
-	def    *prometheus.Desc
-}
-
-func NewHfscQdiscCollector(qdisc netlink.Qdisc, link string) (Collector, error) {
-	module := "hfsc"
-	return &hfscQdiscCollector{
-		link:  link,
-		qdisc: qdisc.(*netlink.Hfsc),
-		refcnt: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "refcnt"),
-			"Qdisc refcnt",
-			qdisclabels, nil,
-		),
-		def: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "default"),
-			"Default class id for the HFSC qdisc",
-			qdisclabels, nil,
-		),
-	}, nil
-}
-
-func (c *hfscQdiscCollector) Update(ch chan<- prometheus.Metric) error {
-	host, err := os.Hostname()
-	if err != nil {
-		logrus.Errorf("couldn't get host name: %v\n", err)
-		return err
-	}
-	linkindex := strconv.Itoa(c.qdisc.Attrs().LinkIndex)
-
-	ch <- prometheus.MustNewConstMetric(
-		c.refcnt,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Attrs().Refcnt),
-		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMin, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.refcnt,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Defcls),
+		qc.packets,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Packets),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
-	)
-	return nil
-}
-
-// collector for fq_codel qdisc
-type fqcodelCollector struct {
-	link     string
-	qdisc    *netlink.FqCodel
-	refcnt   *prometheus.Desc
-	target   *prometheus.Desc
-	limit    *prometheus.Desc
-	interval *prometheus.Desc
-	ecn      *prometheus.Desc
-	flows    *prometheus.Desc
-	quantum  *prometheus.Desc
-}
-
-func NewFqcodelQdiscCollector(qdisc netlink.Qdisc, link string) (Collector, error) {
-	module := "fqcodel"
-	return &fqcodelCollector{
-		link:  link,
-		qdisc: qdisc.(*netlink.FqCodel),
-		refcnt: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "refcnt"),
-			"Qdisc refcnt",
-			qdisclabels, nil,
-		),
-		target: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "target"),
-			"The acceptable minimum standing/persistent queue delay",
-			qdisclabels, nil,
-		),
-		limit: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "limit"),
-			"The hard limit on the real queue size",
-			qdisclabels, nil,
-		),
-		interval: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "interval"),
-			"Used to ensure that the measured minimum delay does not become too stale",
-			qdisclabels, nil,
-		),
-		ecn: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "ecn"),
-			"Can be used to mark packets instead of dropping them",
-			qdisclabels, nil,
-		),
-		flows: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "flows"),
-			"The number of flows into which the incoming packets are classified",
-			qdisclabels, nil,
-		),
-		quantum: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, module, "quantum"),
-			"The number of flows into which the incoming packets are classified",
-			qdisclabels, nil,
-		),
-	}, nil
-}
-
-func (c *fqcodelCollector) Update(ch chan<- prometheus.Metric) error {
-	host, err := os.Hostname()
-	if err != nil {
-		logrus.Errorf("couldn't get host name: %v\n", err)
-		return err
-	}
-	linkindex := strconv.Itoa(c.qdisc.Attrs().LinkIndex)
-
-	ch <- prometheus.MustNewConstMetric(
-		c.refcnt,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Attrs().Refcnt),
-		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.target,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Target),
+		qc.bps,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Bps),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.limit,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Limit),
+		qc.pps,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Pps),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.interval,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Interval),
+		qc.backlog,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Backlog),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.ecn,
-		prometheus.GaugeValue,
-		float64(c.qdisc.ECN),
+		qc.drops,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Drops),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.flows,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Flows),
+		qc.overlimits,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Overlimits),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
-		c.quantum,
-		prometheus.GaugeValue,
-		float64(c.qdisc.Quantum),
+		qc.qlen,
+		prometheus.CounterValue,
+		float64(qc.qdisc.Stats.Qlen),
 		host,
-		linkindex,
-		c.link,
-		c.qdisc.Type(),
-		netlink.HandleStr(c.qdisc.Attrs().Handle),
-		netlink.HandleStr(c.qdisc.Attrs().Parent),
+		fmt.Sprintf("%d", qc.devID),
+		qc.interf,
+		qc.qdisc.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	return nil
 }

@@ -1,10 +1,14 @@
 package collector
 
 import (
+	"fmt"
+	"net"
+	"os"
 	"sync"
 	"time"
 
-	netlink "github.com/fbegyn/netlink-vishv"
+	"github.com/florianl/go-tc"
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
@@ -31,21 +35,13 @@ type TcCollector struct {
 }
 
 func NewTcCollector(interfaces []string) (*TcCollector, error) {
-	links, err := netlink.LinkList()
-	if err != nil {
-		return nil, err
-	}
-
 	collectors := make(map[string]Collector)
-	for _, link := range links {
-		name := link.Attrs().Name
-		if checkArray(name, interfaces) {
-			dc, err := NewDataCollector(link)
-			if err != nil {
-				return nil, err
-			}
-			collectors[name] = dc
+	for _, interf := range interfaces {
+		dc, err := NewDataCollector(interf)
+		if err != nil {
+			return nil, err
 		}
+		collectors[interf] = dc
 	}
 	return &TcCollector{collectors}, nil
 }
@@ -98,66 +94,56 @@ func execute(name string, c Collector, ch chan<- prometheus.Metric) {
 }
 
 type dataCollector struct {
-	name    string
-	Link    Collector
+	interf  *net.Interface
+	sock    *tc.Tc
+	Logger  log.Logger
 	Qdiscs  []Collector
 	Classes []Collector
 }
 
-func NewDataCollector(link netlink.Link) (Collector, error) {
-	data := GetData(link)
-	name := link.Attrs().Name
-	linkc, err := NewLinkCollector(link)
+func NewDataCollector(devName string) (Collector, error) {
+	rtnl, err := tc.Open(&tc.Config{})
 	if err != nil {
-		return nil, err
+		fmt.Fprintf(os.Stderr, "could not open rtnetlink socket: %v\n", err)
 	}
-
-	var qds []Collector
-	for _, qd := range *data.qdiscs {
-		var col Collector
-		switch qd.Type() {
-		case "fq_codel":
-			col, err = NewFqcodelQdiscCollector(qd, name)
-			if err != nil {
-				return nil, err
-			}
-		case "hfsc":
-			col, err = NewHfscQdiscCollector(qd, name)
-			if err != nil {
-				return nil, err
-			}
-		default:
-			col, err = NewGenericQdiscCollector(qd, name)
-			if err != nil {
-				return nil, err
-			}
+	defer func() {
+		if err := rtnl.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "could not close rtnetlink socket: %v\n", err)
 		}
-		qds = append(qds, col)
+	}()
+
+	var logger log.Logger
+	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller, "component", "DataCollector")
+
+	interf, err := net.InterfaceByName(devName)
+	if err != nil {
+		logger.Log("err", err)
 	}
 
-	var cls []Collector
-	for _, cl := range *data.classes {
-		var col Collector
-		switch cl.Type() {
-		case "hfsc":
-			col, err = NewHfscClassCollector(cl, name)
-			if err != nil {
-				return nil, err
-			}
-		default:
-			col, err = NewGenericClassCollector(cl, name)
-			if err != nil {
-				return nil, err
-			}
+	coll := dataCollector{
+		interf: interf,
+		sock:   rtnl,
+		Logger: logger,
+	}
+
+	qdiscs, classes := GetNetlinkData(coll.sock, uint32(coll.interf.Index), coll.Logger)
+
+	for _, qd := range qdiscs {
+		qc, err := NewQdiscCollector(coll.interf, qd)
+		if err != nil {
+			coll.Logger.Log("msg", "failed to initiate new collector", "err", err)
 		}
-		cls = append(cls, col)
+		coll.Qdiscs = append(coll.Qdiscs, qc)
+	}
+	for _, cl := range classes {
+		fmt.Println(cl.Kind)
 	}
 
-	return &dataCollector{name, linkc, qds, cls}, nil
+	return &coll, nil
 }
 
 func (d *dataCollector) Update(ch chan<- prometheus.Metric) error {
-	d.Link.Update(ch)
 	for _, qdisc := range d.Qdiscs {
 		qdisc.Update(ch)
 	}
