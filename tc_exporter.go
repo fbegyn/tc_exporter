@@ -12,6 +12,40 @@ import (
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
+func main() {
+	var (
+		promPort = kingpin.Flag("promport", "Port on which the prometheus exporter runs").Default("9601").Short('P').String()
+	)
+	// CLI arguments parsing
+	kingpin.Version("v0.4.3")
+	kingpin.Parse()
+
+	viper.SetConfigName("config")
+	viper.SetConfigType("toml")
+	viper.AddConfigPath("/etc/tc_exporter/")
+	viper.AddConfigPath("$HOME/.config/tc_exporter/")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			logrus.Infoln("no config file found, using defaults")
+		} else {
+			logrus.Fatalln("failed to read config file")
+		}
+	}
+
+	// Configuring the logging
+	customFormatter := new(logrus.TextFormatter)
+	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
+	customFormatter.FullTimestamp = true
+	logrus.SetFormatter(customFormatter)
+
+	logrus.Infoln("prometheus exporter enabled")
+
+	http.Handle("/metrics", newHandler(100, viper.GetStringSlice("interfaces")))
+
+	logrus.Fatal(http.ListenAndServe(":"+*promPort, nil))
+}
+
 type handler struct {
 	unfilteredHandler       http.Handler
 	exporterMetricsRegistry *prometheus.Registry
@@ -64,38 +98,4 @@ func (h *handler) innerHandler() (http.Handler, error) {
 	)
 
 	return handler, nil
-}
-
-func main() {
-	var (
-		promPort = kingpin.Flag("promport", "Port on which the prometheus exporter runs").Default("9601").Short('P').String()
-	)
-	// CLI arguments parsing
-	kingpin.Version("v0.4.3")
-	kingpin.Parse()
-
-	viper.SetConfigName("config")
-	viper.SetConfigType("toml")
-	viper.AddConfigPath("/etc/tc_exporter/")
-	viper.AddConfigPath("$HOME/.config/tc_exporter/")
-	viper.AddConfigPath(".")
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logrus.Infoln("no config file found, using defaults")
-		} else {
-			logrus.Fatalln("failed to read config file")
-		}
-	}
-
-	// Configuring the logging
-	customFormatter := new(logrus.TextFormatter)
-	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
-	customFormatter.FullTimestamp = true
-	logrus.SetFormatter(customFormatter)
-
-	logrus.Infoln("prometheus exporter enabled")
-
-	http.Handle("/metrics", newHandler(100, viper.GetStringSlice("interfaces")))
-
-	logrus.Fatal(http.ListenAndServe(":"+*promPort, nil))
 }
