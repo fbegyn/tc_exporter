@@ -108,7 +108,7 @@ func (qc *QdiscCollector) Update(ch chan<- prometheus.Metric) error {
 	)
 	ch <- prometheus.MustNewConstMetric(
 		qc.bps,
-		prometheus.CounterValue,
+		prometheus.GaugeValue,
 		float64(qc.qdisc.Stats.Bps),
 		host,
 		fmt.Sprintf("%d", qc.devID),
@@ -119,7 +119,7 @@ func (qc *QdiscCollector) Update(ch chan<- prometheus.Metric) error {
 	)
 	ch <- prometheus.MustNewConstMetric(
 		qc.pps,
-		prometheus.CounterValue,
+		prometheus.GaugeValue,
 		float64(qc.qdisc.Stats.Pps),
 		host,
 		fmt.Sprintf("%d", qc.devID),
