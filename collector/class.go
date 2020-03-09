@@ -115,7 +115,7 @@ func (cc *ClassCollector) Update(ch chan<- prometheus.Metric) error {
 	)
 	ch <- prometheus.MustNewConstMetric(
 		cc.bps,
-		prometheus.CounterValue,
+		prometheus.GaugeValue,
 		float64(cc.class.Stats.Bps),
 		host,
 		fmt.Sprintf("%d", cc.devID),
@@ -126,7 +126,7 @@ func (cc *ClassCollector) Update(ch chan<- prometheus.Metric) error {
 	)
 	ch <- prometheus.MustNewConstMetric(
 		cc.pps,
-		prometheus.CounterValue,
+		prometheus.GaugeValue,
 		float64(cc.class.Stats.Pps),
 		host,
 		fmt.Sprintf("%d", cc.devID),
