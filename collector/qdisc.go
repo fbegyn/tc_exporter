@@ -84,7 +84,7 @@ func (qc *QdiscCollector) Update(ch chan<- prometheus.Metric) error {
 	}
 
 	handleMaj, handleMin := HandleStr(qc.qdisc.Handle)
-	parentMin, parentMaj := HandleStr(qc.qdisc.Parent)
+	parentMaj, parentMin := HandleStr(qc.qdisc.Parent)
 
 	ch <- prometheus.MustNewConstMetric(
 		qc.bytes,
@@ -95,7 +95,7 @@ func (qc *QdiscCollector) Update(ch chan<- prometheus.Metric) error {
 		qc.interf,
 		qc.qdisc.Kind,
 		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMin, parentMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
 	)
 	ch <- prometheus.MustNewConstMetric(
 		qc.packets,

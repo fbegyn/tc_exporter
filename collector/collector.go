@@ -137,7 +137,18 @@ func NewDataCollector(devName string) (Collector, error) {
 		coll.Qdiscs = append(coll.Qdiscs, qc)
 	}
 	for _, cl := range classes {
-		fmt.Println(cl.Kind)
+		switch cl.Kind {
+		case "hfsc":
+			fmt.Printf("%v - %v\n", cl.Kind, cl.Hfsc)
+			if cl.Hfsc == nil {
+				continue
+			}
+			cc, err := NewHfscCollector(coll.interf, cl)
+			if err != nil {
+				coll.Logger.Log("msg", "failed to initiate new collector", "err", err)
+			}
+			coll.Classes = append(coll.Classes, cc)
+		}
 	}
 
 	return &coll, nil
