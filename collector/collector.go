@@ -10,7 +10,6 @@ import (
 	"github.com/florianl/go-tc"
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 const namespace = "tc"
@@ -83,7 +82,6 @@ func execute(name string, c Collector, ch chan<- prometheus.Metric) {
 	var success float64
 
 	if err != nil {
-		logrus.Errorf("failed collection for %s: %v", name, err)
 		success = 0
 	} else {
 		success = 1
@@ -139,11 +137,16 @@ func NewDataCollector(devName string) (Collector, error) {
 	for _, cl := range classes {
 		switch cl.Kind {
 		case "hfsc":
-			fmt.Printf("%v - %v\n", cl.Kind, cl.Hfsc)
 			if cl.Hfsc == nil {
 				continue
 			}
 			cc, err := NewHfscCollector(coll.interf, cl)
+			if err != nil {
+				coll.Logger.Log("msg", "failed to initiate new collector", "err", err)
+			}
+			coll.Classes = append(coll.Classes, cc)
+		default:
+			cc, err := NewClassCollector(coll.interf, cl)
 			if err != nil {
 				coll.Logger.Log("msg", "failed to initiate new collector", "err", err)
 			}
