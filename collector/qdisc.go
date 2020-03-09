@@ -7,7 +7,6 @@ import (
 
 	"github.com/florianl/go-tc"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -79,7 +78,6 @@ func NewQdiscCollector(interf *net.Interface, qdisc tc.Object) (Collector, error
 func (qc *QdiscCollector) Update(ch chan<- prometheus.Metric) error {
 	host, err := os.Hostname()
 	if err != nil {
-		logrus.Errorf("couldn't get host name: %v\n", err)
 		return err
 	}
 

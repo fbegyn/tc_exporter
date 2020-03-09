@@ -7,7 +7,6 @@ import (
 
 	"github.com/florianl/go-tc"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -86,7 +85,6 @@ func NewClassCollector(interf *net.Interface, class tc.Object) (Collector, error
 func (cc *ClassCollector) Update(ch chan<- prometheus.Metric) error {
 	host, err := os.Hostname()
 	if err != nil {
-		logrus.Errorf("couldn't get host name: %v\n", err)
 		return err
 	}
 
@@ -273,7 +271,6 @@ func newServiceCurveCollector(class tc.Object, curve *tc.ServiceCurve, sc string
 func (c *serviceCurveCollector) Update(ch chan<- prometheus.Metric) error {
 	host, err := os.Hostname()
 	if err != nil {
-		logrus.Errorf("couldn't get host name: %v\n", err)
 		return err
 	}
 
