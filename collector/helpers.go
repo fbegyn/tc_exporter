@@ -39,7 +39,7 @@ func GetClasses(sock *tc.Tc, devid uint32, logger log.Logger) []tc.Object {
 	}
 	var cl []tc.Object
 	for _, class := range classes {
-		if class.Ifindex == devid {
+		if class.Ifindex == devid && class.Kind != "fq_codel" {
 			cl = append(cl, class)
 		}
 	}

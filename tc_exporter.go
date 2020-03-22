@@ -12,6 +12,10 @@ import (
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
+type Config struct {
+	Interfaces []string `mapstructure:"interfaces"`
+}
+
 func main() {
 	var (
 		promPort = kingpin.Flag("promport", "Port on which the prometheus exporter runs").Default("9601").Short('P').String()
@@ -39,9 +43,14 @@ func main() {
 	customFormatter.FullTimestamp = true
 	logrus.SetFormatter(customFormatter)
 
+	logrus.Infof("reading config file\n")
+
+	var cf Config
+	viper.Unmarshal(&cf)
+
 	logrus.Infoln("prometheus exporter enabled")
 
-	http.Handle("/metrics", newHandler(100, viper.GetStringSlice("interfaces")))
+	http.Handle("/metrics", newHandler(100, cf.Interfaces))
 
 	logrus.Fatal(http.ListenAndServe(":"+*promPort, nil))
 }
