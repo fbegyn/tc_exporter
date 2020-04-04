@@ -63,8 +63,8 @@ func main() {
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// Start listening for HTTP connections.
-	logger.Log("msg", "starting TC exporter", "port", ":9601")
-	if err := http.ListenAndServe(":9601", mux); err != nil {
+	logger.Log("msg", "starting TC exporter", "port", ":9704")
+	if err := http.ListenAndServe(":9704", mux); err != nil {
 		logger.Log("msg", "cannot start TC exporter", "err", err)
 	}
 }
