@@ -19,11 +19,13 @@ var (
 	)
 )
 
+// TcCollector is the object that will collect TC data for the interface
 type TcCollector struct {
 	logger     log.Logger
 	Collectors map[string][]prometheus.Collector
 }
 
+// NewTcCollector create a new TcCollector given a network interface
 func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collector, error) {
 	// setup the logger for the collector
 	collectors := make(map[string][]prometheus.Collector)
@@ -58,6 +60,7 @@ func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collecto
 	}, nil
 }
 
+// Describe implements Collector
 func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- scrapeDurationDesc
 
@@ -68,8 +71,8 @@ func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
+// Collect fetches and updates the data the collector is exporting
 func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
-
 	collectors := 0
 	for _, t := range t.Collectors {
 		collectors += len(t)

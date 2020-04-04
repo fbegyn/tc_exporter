@@ -12,7 +12,7 @@ import (
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
-type Config struct {
+type config struct {
 	Interfaces []string `mapstructure:"interfaces"`
 }
 
@@ -45,12 +45,12 @@ func main() {
 		} else {
 		}
 	}
-	var cf Config
+	var cf config
 	err := viper.Unmarshal(&cf)
 	if err != nil {
 		logger.Log("level", "ERROR", "msg", "failed to read config file", "error", err)
 	}
-	logger.Log("msg", "succesfully read config file")
+	logger.Log("msg", "successfully read config file")
 
 	collector, err := tcexporter.NewTcCollector(cf.Interfaces, logger)
 	if err != nil {
