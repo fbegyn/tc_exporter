@@ -35,7 +35,7 @@ func TestQdiscCollector(t *testing.T) {
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 			logger = log.With(logger, "test", "collector")
 
-			qc, err := NewQdiscCollector(interf, logger)
+			qc, err := NewQdiscCollector(0, interf, logger)
 			if err != nil {
 				t.Fatalf("failed to create qdisc collector for %s: %v", interf.Name, err)
 			}
