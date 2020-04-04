@@ -1,0 +1,18 @@
+image: archlinux
+packages:
+  - go
+  - nfpm
+environment:
+  GO111MODULE: "on"
+sources:
+  - https://github.com/fbegyn/tc_exporter
+tasks:
+  - test: |
+      cd tc_exporter
+      go test -exec sudo -race ./collector
+  - build: |
+      cd tc_exporter
+      make build
+  - package: |
+      cd tc_exporter
+      make
