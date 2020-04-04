@@ -1,4 +1,4 @@
-package collector
+package tc_collector
 
 import (
 	"fmt"
@@ -6,7 +6,9 @@ import (
 	"os"
 
 	"github.com/florianl/go-tc"
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -15,9 +17,8 @@ var (
 )
 
 type ClassCollector struct {
-	interf     string
-	devID      uint32
-	class      tc.Object
+	logger     log.Logger
+	interf     *net.Interface
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
 	bps        *prometheus.Desc
@@ -29,18 +30,33 @@ type ClassCollector struct {
 	requeues   *prometheus.Desc
 }
 
-func NewClassCollector(interf *net.Interface, class tc.Object) (Collector, error) {
+func NewClassCollector(interf *net.Interface, clog log.Logger) (prometheus.Collector, error) {
+	// Setup logger for qdisc collector
+	clog = log.With(clog, "collector", "class")
+	clog.Log("msg", "making class collector", "inteface", interf.Name)
+
+	// Create socket for interface to get qdiscs from
+	rtnl, err := tc.Open(&tc.Config{})
+	if err != nil {
+		clog.Log("msg", "could not open rtnetlink socket", "err", err)
+		return nil, err
+	}
+	defer func() {
+		if err := rtnl.Close(); err != nil {
+			clog.Log("msg", "could not close rtnetlink socket", "err", err)
+		}
+	}()
+
 	return &ClassCollector{
-		interf: interf.Name,
-		devID:  uint32(interf.Index),
-		class:  class,
+		logger: clog,
+		interf: interf,
 		bytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "bytes"),
+			prometheus.BuildFQName(namespace, "class", "bytes_total"),
 			"Qdisc byte counter",
 			classlabels, nil,
 		),
 		packets: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "packets"),
+			prometheus.BuildFQName(namespace, "class", "packets_total"),
 			"Qdisc packet counter",
 			classlabels, nil,
 		),
@@ -55,200 +71,189 @@ func NewClassCollector(interf *net.Interface, class tc.Object) (Collector, error
 			classlabels, nil,
 		),
 		backlog: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "backlog"),
+			prometheus.BuildFQName(namespace, "class", "backlog_total"),
 			"Qdisc queue backlog",
 			classlabels, nil,
 		),
 		drops: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "drops"),
+			prometheus.BuildFQName(namespace, "class", "drops_total"),
 			"Qdisc queue drops",
 			classlabels, nil,
 		),
 		overlimits: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "overlimits"),
+			prometheus.BuildFQName(namespace, "class", "overlimits_total"),
 			"Qdisc queue overlimits",
 			classlabels, nil,
 		),
 		qlen: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "qlen"),
+			prometheus.BuildFQName(namespace, "class", "qlen_total"),
 			"Qdisc queue length",
 			classlabels, nil,
 		),
 		requeues: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "class", "requeque"),
+			prometheus.BuildFQName(namespace, "class", "requeque_total"),
 			"Qdisc requeque counter",
 			classlabels, nil,
 		),
 	}, nil
 }
 
-func (cc *ClassCollector) Update(ch chan<- prometheus.Metric) error {
-	host, err := os.Hostname()
-	if err != nil {
-		return err
+func (cc *ClassCollector) Describe(ch chan<- *prometheus.Desc) {
+	ds := []*prometheus.Desc{
+		cc.backlog,
+		cc.bps,
+		cc.bytes,
+		cc.packets,
+		cc.drops,
+		cc.overlimits,
+		cc.pps,
+		cc.qlen,
 	}
 
-	handleMaj, handleMin := HandleStr(cc.class.Handle)
-	parentMaj, parentMin := HandleStr(cc.class.Parent)
-
-	ch <- prometheus.MustNewConstMetric(
-		cc.bytes,
-		prometheus.CounterValue,
-		float64(cc.class.Stats.Bytes),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.packets,
-		prometheus.CounterValue,
-		float64(cc.class.Stats.Packets),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.bps,
-		prometheus.GaugeValue,
-		float64(cc.class.Stats.Bps),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.pps,
-		prometheus.GaugeValue,
-		float64(cc.class.Stats.Pps),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.backlog,
-		prometheus.CounterValue,
-		float64(cc.class.Stats.Backlog),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.drops,
-		prometheus.CounterValue,
-		float64(cc.class.Stats.Drops),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.overlimits,
-		prometheus.CounterValue,
-		float64(cc.class.Stats.Overlimits),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.qlen,
-		prometheus.CounterValue,
-		float64(cc.class.Stats.Qlen),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		cc.requeues,
-		prometheus.CounterValue,
-		float64(cc.class.Stats2.Requeues),
-		host,
-		fmt.Sprintf("%d", cc.devID),
-		cc.interf,
-		cc.class.Kind,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	return nil
+	for _, d := range ds {
+		ch <- d
+	}
 }
 
-type HfscCollector struct {
-	interf string
-	devID  uint32
+func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
+	host, err := os.Hostname()
+	if err != nil {
+		cc.logger.Log("msg", "failed to get hostname", "err", err)
+	}
+
+	classes, err := getClasses(uint32(cc.interf.Index))
+	if err != nil {
+		cc.logger.Log("msg", "failed to get classes", "interface", cc.interf.Name, "err", err)
+	}
+
+	for _, cl := range classes {
+		handleMaj, handleMin := HandleStr(cl.Handle)
+		parentMaj, parentMin := HandleStr(cl.Parent)
+
+		ch <- prometheus.MustNewConstMetric(
+			cc.bytes,
+			prometheus.CounterValue,
+			float64(cl.Stats.Bytes),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.packets,
+			prometheus.CounterValue,
+			float64(cl.Stats.Packets),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.bps,
+			prometheus.GaugeValue,
+			float64(cl.Stats.Bps),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.pps,
+			prometheus.GaugeValue,
+			float64(cl.Stats.Pps),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.backlog,
+			prometheus.CounterValue,
+			float64(cl.Stats.Backlog),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.drops,
+			prometheus.CounterValue,
+			float64(cl.Stats.Drops),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.overlimits,
+			prometheus.CounterValue,
+			float64(cl.Stats.Overlimits),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.qlen,
+			prometheus.CounterValue,
+			float64(cl.Stats.Qlen),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			cc.requeues,
+			prometheus.CounterValue,
+			float64(cl.Stats2.Requeues),
+			host,
+			fmt.Sprintf("%d", cc.interf.Index),
+			cc.interf.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+	}
+}
+
+type ServiceCurveCollector struct {
+	logger log.Logger
+	interf *net.Interface
 	class  tc.Object
-	usc    Collector
-	rsc    Collector
-	fsc    Collector
-}
-
-func NewHfscCollector(interf *net.Interface, class tc.Object) (Collector, error) {
-
-	FSC, _ := newServiceCurveCollector(class, class.Hfsc.Fsc, "fsc")
-	RSC, _ := newServiceCurveCollector(class, class.Hfsc.Fsc, "usc")
-	USC, _ := newServiceCurveCollector(class, class.Hfsc.Fsc, "rsc")
-
-	return &HfscCollector{
-		interf: interf.Name,
-		devID:  uint32(interf.Index),
-		class:  class,
-		usc:    USC,
-		rsc:    RSC,
-		fsc:    FSC,
-	}, nil
-}
-
-func (c *HfscCollector) Update(ch chan<- prometheus.Metric) error {
-	c.usc.Update(ch)
-	c.rsc.Update(ch)
-	c.fsc.Update(ch)
-	return nil
-}
-
-type serviceCurveCollector struct {
-	interf string
-	sc     string
-	devID  uint32
-	class  tc.Object
-	curve  *tc.ServiceCurve
+	curves map[string]*tc.ServiceCurve
 	Burst  *prometheus.Desc
 	Delay  *prometheus.Desc
 	Rate   *prometheus.Desc
 }
 
-func newServiceCurveCollector(class tc.Object, curve *tc.ServiceCurve, sc string) (Collector, error) {
+func NewServiceCurveCollector(class tc.Object, interf *net.Interface, sclog log.Logger) (prometheus.Collector, error) {
 
-	interf, err := net.InterfaceByIndex(int(class.Ifindex))
-	if err != nil {
-		return nil, err
-	}
+	sclog = log.With(sclog, "collector", "hfsc")
+	sclog.Log("msg", "making SC collector", "inteface", interf.Name)
 
-	return &serviceCurveCollector{
-		interf: interf.Name,
-		sc:     sc,
-		devID:  class.Ifindex,
+	curves := make(map[string]*tc.ServiceCurve)
+
+	return &ServiceCurveCollector{
+		logger: sclog,
+		interf: interf,
+		curves: curves,
 		class:  class,
-		curve:  curve,
 		Burst: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "service_curve", "burst"),
 			"Burst parameter of the service curve",
@@ -267,48 +272,90 @@ func newServiceCurveCollector(class tc.Object, curve *tc.ServiceCurve, sc string
 	}, nil
 }
 
+func (c *ServiceCurveCollector) Describe(ch chan<- *prometheus.Desc) {
+	ds := []*prometheus.Desc{
+		c.Burst,
+		c.Delay,
+		c.Rate,
+	}
+
+	for _, d := range ds {
+		ch <- d
+	}
+}
+
 //curvelabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent", "leaf"}
-func (c *serviceCurveCollector) Update(ch chan<- prometheus.Metric) error {
+func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	host, err := os.Hostname()
 	if err != nil {
-		return err
 	}
 
 	handleMaj, handleMin := HandleStr(c.class.Handle)
 	parentMaj, parentMin := HandleStr(c.class.Parent)
 
-	ch <- prometheus.MustNewConstMetric(
-		c.Burst,
-		prometheus.GaugeValue,
-		float64(c.curve.M1),
-		host,
-		fmt.Sprintf("%d", c.devID),
-		c.interf,
-		c.sc,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		c.Delay,
-		prometheus.GaugeValue,
-		float64(c.curve.D),
-		host,
-		fmt.Sprintf("%d", c.devID),
-		c.interf,
-		c.sc,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	ch <- prometheus.MustNewConstMetric(
-		c.Rate,
-		prometheus.GaugeValue,
-		float64(c.curve.M2),
-		host,
-		fmt.Sprintf("%d", c.devID),
-		c.interf,
-		c.sc,
-		fmt.Sprintf("%x:%x", handleMaj, handleMin),
-		fmt.Sprintf("%x:%x", parentMaj, parentMin),
-	)
-	return nil
+	fmt.Println("hello world")
+
+	fmt.Print(c.class)
+
+	for typ, sc := range c.curves {
+		ch <- prometheus.MustNewConstMetric(
+			c.Burst,
+			prometheus.GaugeValue,
+			float64(sc.M1),
+			host,
+			fmt.Sprintf("%d", c.interf.Index),
+			c.interf.Name,
+			typ,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			c.Delay,
+			prometheus.GaugeValue,
+			float64(sc.D),
+			host,
+			fmt.Sprintf("%d", c.interf.Index),
+			c.interf.Name,
+			typ,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			c.Rate,
+			prometheus.GaugeValue,
+			float64(sc.M2),
+			host,
+			fmt.Sprintf("%d", c.interf.Index),
+			c.interf.Name,
+			typ,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+	}
+}
+
+func getClasses(devid uint32) ([]tc.Object, error) {
+	// Create socket for interface to get classes from
+	sock, err := tc.Open(&tc.Config{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := sock.Close(); err != nil {
+		}
+	}()
+	classes, err := sock.Class().Get(&tc.Msg{
+		Family:  unix.AF_UNSPEC,
+		Ifindex: devid,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var cl []tc.Object
+	for _, class := range classes {
+		if class.Ifindex == devid && class.Kind != "fq_codel" {
+			cl = append(cl, class)
+		}
+	}
+	return cl, nil
 }
