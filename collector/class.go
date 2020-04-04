@@ -16,6 +16,7 @@ var (
 	curvelabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent"}
 )
 
+// ClassCollector is the object that will collect Class data for the interface
 type ClassCollector struct {
 	logger     log.Logger
 	interf     *net.Interface
@@ -30,6 +31,7 @@ type ClassCollector struct {
 	requeues   *prometheus.Desc
 }
 
+// NewClassCollector create a new ClassCollector given a network interface
 func NewClassCollector(interf *net.Interface, clog log.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	clog = log.With(clog, "collector", "class")
@@ -98,6 +100,7 @@ func NewClassCollector(interf *net.Interface, clog log.Logger) (prometheus.Colle
 	}, nil
 }
 
+// Describe implements Collector
 func (cc *ClassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 		cc.backlog,
@@ -115,6 +118,7 @@ func (cc *ClassCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
+// Collect fetches and updates the data the collector is exporting
 func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 	host, err := os.Hostname()
 	if err != nil {
@@ -232,6 +236,7 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// ServiceCurveCollector is the object that will collect Service Curve data for the interface
 type ServiceCurveCollector struct {
 	logger log.Logger
 	interf *net.Interface
@@ -241,6 +246,7 @@ type ServiceCurveCollector struct {
 	Rate   *prometheus.Desc
 }
 
+// NewServiceCurveCollector create a new ServiceCurveCollector given a network interface
 func NewServiceCurveCollector(interf *net.Interface, sclog log.Logger) (prometheus.Collector, error) {
 
 	sclog = log.With(sclog, "collector", "hfsc")
@@ -270,6 +276,7 @@ func NewServiceCurveCollector(interf *net.Interface, sclog log.Logger) (promethe
 	}, nil
 }
 
+// Describe implements Collector
 func (c *ServiceCurveCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 		c.Burst,
@@ -282,7 +289,7 @@ func (c *ServiceCurveCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-//curvelabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent", "leaf"}
+// Collect fetches and updates the data the collector is exporting
 func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	host, err := os.Hostname()
 	if err != nil {
