@@ -44,6 +44,12 @@ func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collecto
 			return nil, err
 		}
 		collectors[interf] = append(collectors[interf], cColl)
+		// Setup Service Curve collector for interface
+		scColl, err := NewServiceCurveCollector(device, logger)
+		if err != nil {
+			return nil, err
+		}
+		collectors[interf] = append(collectors[interf], scColl)
 	}
 
 	return &TcCollector{

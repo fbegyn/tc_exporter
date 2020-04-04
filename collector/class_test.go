@@ -196,7 +196,7 @@ func TestServiceCurveCollector(t *testing.T) {
 			}
 
 			// Create ServiceCurve collector for the class
-			qc, err := NewServiceCurveCollector(cl, interf, logger)
+			qc, err := NewServiceCurveCollector(interf, logger)
 			if err != nil {
 				rtnl.Link.Delete(uint32(interf.Index))
 				t.Fatalf("failed to create Service Curve collector for %s: %v", interf.Name, err)

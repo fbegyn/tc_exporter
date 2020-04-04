@@ -235,14 +235,13 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 type ServiceCurveCollector struct {
 	logger log.Logger
 	interf *net.Interface
-	class  tc.Object
 	curves map[string]*tc.ServiceCurve
 	Burst  *prometheus.Desc
 	Delay  *prometheus.Desc
 	Rate   *prometheus.Desc
 }
 
-func NewServiceCurveCollector(class tc.Object, interf *net.Interface, sclog log.Logger) (prometheus.Collector, error) {
+func NewServiceCurveCollector(interf *net.Interface, sclog log.Logger) (prometheus.Collector, error) {
 
 	sclog = log.With(sclog, "collector", "hfsc")
 	sclog.Log("msg", "making SC collector", "inteface", interf.Name)
@@ -251,9 +250,8 @@ func NewServiceCurveCollector(class tc.Object, interf *net.Interface, sclog log.
 
 	return &ServiceCurveCollector{
 		logger: sclog,
-		interf: interf,
 		curves: curves,
-		class:  class,
+		interf: interf,
 		Burst: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "service_curve", "burst"),
 			"Burst parameter of the service curve",
@@ -288,51 +286,62 @@ func (c *ServiceCurveCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	host, err := os.Hostname()
 	if err != nil {
+		c.logger.Log("msg", "failed to get hostname", "err", err)
 	}
 
-	handleMaj, handleMin := HandleStr(c.class.Handle)
-	parentMaj, parentMin := HandleStr(c.class.Parent)
-
-	if c.class.Hfsc != nil {
-		c.curves["fsc"] = c.class.Hfsc.Fsc
-		c.curves["rsc"] = c.class.Hfsc.Rsc
-		c.curves["usc"] = c.class.Hfsc.Usc
+	classes, err := getClasses(uint32(c.interf.Index))
+	if err != nil {
+		c.logger.Log("msg", "failed to get classes", "interface", c.interf.Name, "err", err)
 	}
 
-	for typ, sc := range c.curves {
-		ch <- prometheus.MustNewConstMetric(
-			c.Burst,
-			prometheus.GaugeValue,
-			float64(sc.M1),
-			host,
-			fmt.Sprintf("%d", c.interf.Index),
-			c.interf.Name,
-			typ,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			c.Delay,
-			prometheus.GaugeValue,
-			float64(sc.D),
-			host,
-			fmt.Sprintf("%d", c.interf.Index),
-			c.interf.Name,
-			typ,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			c.Rate,
-			prometheus.GaugeValue,
-			float64(sc.M2),
-			host,
-			fmt.Sprintf("%d", c.interf.Index),
-			c.interf.Name,
-			typ,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
+	for _, cl := range classes {
+		handleMaj, handleMin := HandleStr(cl.Handle)
+		parentMaj, parentMin := HandleStr(cl.Parent)
+
+		if cl.Hfsc != nil {
+			c.curves["fsc"] = cl.Hfsc.Fsc
+			c.curves["rsc"] = cl.Hfsc.Rsc
+			c.curves["usc"] = cl.Hfsc.Usc
+		}
+
+		for typ, sc := range c.curves {
+			if sc == nil {
+				continue
+			}
+			ch <- prometheus.MustNewConstMetric(
+				c.Burst,
+				prometheus.GaugeValue,
+				float64(sc.M1),
+				host,
+				fmt.Sprintf("%d", c.interf.Index),
+				c.interf.Name,
+				typ,
+				fmt.Sprintf("%x:%x", handleMaj, handleMin),
+				fmt.Sprintf("%x:%x", parentMaj, parentMin),
+			)
+			ch <- prometheus.MustNewConstMetric(
+				c.Delay,
+				prometheus.GaugeValue,
+				float64(sc.D),
+				host,
+				fmt.Sprintf("%d", c.interf.Index),
+				c.interf.Name,
+				typ,
+				fmt.Sprintf("%x:%x", handleMaj, handleMin),
+				fmt.Sprintf("%x:%x", parentMaj, parentMin),
+			)
+			ch <- prometheus.MustNewConstMetric(
+				c.Rate,
+				prometheus.GaugeValue,
+				float64(sc.M2),
+				host,
+				fmt.Sprintf("%d", c.interf.Index),
+				c.interf.Name,
+				typ,
+				fmt.Sprintf("%x:%x", handleMaj, handleMin),
+				fmt.Sprintf("%x:%x", parentMaj, parentMin),
+			)
+		}
 	}
 }
 
