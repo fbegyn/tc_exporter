@@ -1,4 +1,4 @@
-package tc_collector
+package tccollector
 
 import (
 	"net"

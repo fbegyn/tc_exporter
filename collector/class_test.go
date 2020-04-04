@@ -1,4 +1,4 @@
-package tc_collector
+package tccollector
 
 import (
 	"net"
@@ -93,6 +93,7 @@ func TestServiceCurveCollector(t *testing.T) {
 				}
 			}()
 
+			// Add HFSC qdisc
 			qmsg := tc.Msg{
 				Family:  unix.AF_UNSPEC,
 				Ifindex: uint32(interf.Index),
@@ -100,7 +101,6 @@ func TestServiceCurveCollector(t *testing.T) {
 				Parent:  tc.HandleRoot,
 				Info:    0,
 			}
-
 			err = sock.Qdisc().Add(&tc.Object{
 				Msg: qmsg,
 				Attribute: tc.Attribute{
@@ -127,6 +127,42 @@ func TestServiceCurveCollector(t *testing.T) {
 				t.Fatalf("failed to add HFSC qdisc: %v", err)
 			}
 
+			// Add hfsc Class
+			cmsg := tc.Msg{
+				Family:  unix.AF_UNSPEC,
+				Ifindex: uint32(interf.Index),
+				Handle:  core.BuildHandle(0x1, 0x1),
+				Parent:  core.BuildHandle(0x1, 0x0),
+				Info:    0,
+			}
+			err = sock.Class().Add(&tc.Object{
+				Msg: cmsg,
+				Attribute: tc.Attribute{
+					Kind: "hfsc",
+					Hfsc: &tc.Hfsc{
+						Rsc: &tc.ServiceCurve{
+							M1: 0,
+							D:  0,
+							M2: 10e6,
+						},
+						Fsc: &tc.ServiceCurve{
+							M1: 0,
+							D:  0,
+							M2: 10e6,
+						},
+						Usc: &tc.ServiceCurve{
+							M1: 0,
+							D:  0,
+							M2: 10e6,
+						},
+					},
+				},
+			})
+			if err != nil {
+				rtnl.Link.Delete(uint32(interf.Index))
+				t.Fatalf("failed to add HFSC class: %v", err)
+			}
+
 			// Setup a logger for the test collector
 			var logger log.Logger
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
@@ -141,6 +177,7 @@ func TestServiceCurveCollector(t *testing.T) {
 				rtnl.Link.Delete(uint32(interf.Index))
 				t.Fatalf("failed to get classes for %s: %v", interf.Name, err)
 			}
+
 			// Filter out an HFSC class
 			var cl tc.Object
 			found := false

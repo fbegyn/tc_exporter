@@ -1,9 +1,13 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
+	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/go-kit/kit/log"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
@@ -47,4 +51,20 @@ func main() {
 		logger.Log("level", "ERROR", "msg", "failed to read config file", "error", err)
 	}
 	logger.Log("msg", "succesfully read config file")
+
+	collector, err := tcexporter.NewTcCollector(cf.Interfaces, logger)
+	if err != nil {
+		logger.Log("msg", "failed to create TC collector", "err", err)
+	}
+
+	prometheus.MustRegister(collector)
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	// Start listening for HTTP connections.
+	logger.Log("msg", "starting TC exporter", "port", ":9601")
+	if err := http.ListenAndServe(":9601", mux); err != nil {
+		logger.Log("msg", "cannot start TC exporter", "err", err)
+	}
 }
