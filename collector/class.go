@@ -293,10 +293,6 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	handleMaj, handleMin := HandleStr(c.class.Handle)
 	parentMaj, parentMin := HandleStr(c.class.Parent)
 
-	fmt.Println("hello world")
-
-	fmt.Print(c.class)
-
 	for typ, sc := range c.curves {
 		ch <- prometheus.MustNewConstMetric(
 			c.Burst,

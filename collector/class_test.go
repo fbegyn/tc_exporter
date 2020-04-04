@@ -1,7 +1,6 @@
 package tc_collector
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"testing"
@@ -102,23 +101,30 @@ func TestServiceCurveCollector(t *testing.T) {
 				Info:    0,
 			}
 
-			err = sock.Class().Add(&tc.Object{
+			err = sock.Qdisc().Add(&tc.Object{
 				Msg: qmsg,
 				Attribute: tc.Attribute{
 					Kind: "hfsc",
 					HfscQOpt: &tc.HfscQOpt{
 						DefCls: 1,
 					},
+					Stab: &tc.Stab{
+						Base: &tc.SizeSpec{
+							CellLog:   0,
+							SizeLog:   0,
+							CellAlign: 0,
+							Overhead:  0,
+							LinkLayer: 1,
+							MPU:       0,
+							MTU:       1500,
+							TSize:     0,
+						},
+					},
 				},
 			})
 			if err != nil {
 				rtnl.Link.Delete(uint32(interf.Index))
 				t.Fatalf("failed to add HFSC qdisc: %v", err)
-			}
-
-			qds, _ := sock.Qdisc().Get()
-			for _, q := range qds {
-				fmt.Println(q.Kind)
 			}
 
 			// Setup a logger for the test collector
@@ -142,7 +148,7 @@ func TestServiceCurveCollector(t *testing.T) {
 				if c.Kind == "hfsc" {
 					found = true
 					cl = c
-					logger.Log("msg", "found HFSC class", "class", cl)
+					logger.Log("msg", "found HFSC class", "class", cl.Kind)
 					break
 				}
 			}
