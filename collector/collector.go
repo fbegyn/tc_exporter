@@ -78,6 +78,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 	wg := sync.WaitGroup{}
 	wg.Add(collectors)
 	for name, colls := range t.Collectors {
+		t.logger.Log("msg", "processing scrape", "interface", name)
 		for _, coll := range colls {
 			go func(name string, c prometheus.Collector) {
 				c.Collect(ch)
