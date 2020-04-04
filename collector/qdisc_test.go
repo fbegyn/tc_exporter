@@ -9,7 +9,7 @@ import (
 	"github.com/mdlayher/promtest"
 )
 
-func TestCollector(t *testing.T) {
+func TestQdiscCollector(t *testing.T) {
 
 	tests := []struct {
 		name string

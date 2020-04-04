@@ -37,6 +37,7 @@ func NewQdiscCollector(interf *net.Interface, qlog log.Logger) (prometheus.Colle
 	rtnl, err := tc.Open(&tc.Config{})
 	if err != nil {
 		qlog.Log("msg", "could not open rtnetlink socket", "err", err)
+		return nil, err
 	}
 	defer func() {
 		if err := rtnl.Close(); err != nil {
@@ -47,14 +48,13 @@ func NewQdiscCollector(interf *net.Interface, qlog log.Logger) (prometheus.Colle
 	return &QdiscCollector{
 		logger: qlog,
 		interf: interf,
-		sock:   rtnl,
 		bytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "bytes"),
+			prometheus.BuildFQName(namespace, "qdisc", "bytes_total"),
 			"Qdisc byte counter",
 			qdisclabels, nil,
 		),
 		packets: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "packets"),
+			prometheus.BuildFQName(namespace, "qdisc", "packets_total"),
 			"Qdisc packet counter",
 			qdisclabels, nil,
 		),
@@ -69,22 +69,22 @@ func NewQdiscCollector(interf *net.Interface, qlog log.Logger) (prometheus.Colle
 			qdisclabels, nil,
 		),
 		backlog: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "backlog"),
+			prometheus.BuildFQName(namespace, "qdisc", "backlog_total"),
 			"Qdisc queue backlog",
 			qdisclabels, nil,
 		),
 		drops: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "drops"),
+			prometheus.BuildFQName(namespace, "qdisc", "drops_total"),
 			"Qdisc queue drops",
 			qdisclabels, nil,
 		),
 		overlimits: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "overlimits"),
+			prometheus.BuildFQName(namespace, "qdisc", "overlimits_total"),
 			"Qdisc queue overlimits",
 			qdisclabels, nil,
 		),
 		qlen: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "qlen"),
+			prometheus.BuildFQName(namespace, "qdisc", "qlen_total"),
 			"Qdisc queue length",
 			qdisclabels, nil,
 		),
@@ -114,7 +114,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 		qc.logger.Log("msg", "failed to fetch hostname", "err", err)
 	}
 
-	qdiscs, err := GetQdiscs(qc.sock, uint32(qc.interf.Index))
+	qdiscs, err := getQdiscs(uint32(qc.interf.Index))
 	if err != nil {
 		qc.logger.Log("msg", "failed to get qdiscs", "interface", qc.interf.Name, "err", err)
 	}
@@ -215,7 +215,17 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func GetQdiscs(sock *tc.Tc, devid uint32) ([]tc.Object, error) {
+func getQdiscs(devid uint32) ([]tc.Object, error) {
+	// Create socket for interface to get qdiscs from
+	sock, err := tc.Open(&tc.Config{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := sock.Close(); err != nil {
+		}
+	}()
+
 	qdiscs, err := sock.Qdisc().Get()
 	if err != nil {
 		return nil, err
