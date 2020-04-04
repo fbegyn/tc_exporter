@@ -1,4 +1,4 @@
-package tc_collector
+package tccollector
 
 import (
 	"fmt"
@@ -292,6 +292,12 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 
 	handleMaj, handleMin := HandleStr(c.class.Handle)
 	parentMaj, parentMin := HandleStr(c.class.Parent)
+
+	if c.class.Hfsc != nil {
+		c.curves["fsc"] = c.class.Hfsc.Fsc
+		c.curves["rsc"] = c.class.Hfsc.Rsc
+		c.curves["usc"] = c.class.Hfsc.Usc
+	}
 
 	for typ, sc := range c.curves {
 		ch <- prometheus.MustNewConstMetric(
