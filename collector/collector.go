@@ -33,7 +33,7 @@ func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collecto
 			return nil, err
 		}
 		// Setup Qdisc collector for interface
-		qColl, err := NewQdiscCollector(device, logger)
+		qColl, err := NewQdiscCollector(0, device, logger)
 		if err != nil {
 			return nil, err
 		}

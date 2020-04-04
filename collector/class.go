@@ -35,18 +35,6 @@ func NewClassCollector(interf *net.Interface, clog log.Logger) (prometheus.Colle
 	clog = log.With(clog, "collector", "class")
 	clog.Log("msg", "making class collector", "inteface", interf.Name)
 
-	// Create socket for interface to get qdiscs from
-	rtnl, err := tc.Open(&tc.Config{})
-	if err != nil {
-		clog.Log("msg", "could not open rtnetlink socket", "err", err)
-		return nil, err
-	}
-	defer func() {
-		if err := rtnl.Close(); err != nil {
-			clog.Log("msg", "could not close rtnetlink socket", "err", err)
-		}
-	}()
-
 	return &ClassCollector{
 		logger: clog,
 		interf: interf,
@@ -121,7 +109,7 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 		cc.logger.Log("msg", "failed to get hostname", "err", err)
 	}
 
-	classes, err := getClasses(uint32(cc.interf.Index))
+	classes, err := getClasses(uint32(cc.interf.Index), 0)
 	if err != nil {
 		cc.logger.Log("msg", "failed to get classes", "interface", cc.interf.Name, "err", err)
 	}
@@ -289,7 +277,7 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 		c.logger.Log("msg", "failed to get hostname", "err", err)
 	}
 
-	classes, err := getClasses(uint32(c.interf.Index))
+	classes, err := getClasses(uint32(c.interf.Index), 0)
 	if err != nil {
 		c.logger.Log("msg", "failed to get classes", "interface", c.interf.Name, "err", err)
 	}
@@ -345,9 +333,11 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func getClasses(devid uint32) ([]tc.Object, error) {
+func getClasses(devid uint32, ns int) ([]tc.Object, error) {
 	// Create socket for interface to get classes from
-	sock, err := tc.Open(&tc.Config{})
+	sock, err := tc.Open(&tc.Config{
+		NetNS: ns,
+	})
 	if err != nil {
 		return nil, err
 	}

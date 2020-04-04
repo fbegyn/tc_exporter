@@ -11,12 +11,13 @@ import (
 )
 
 var (
-	qdisclabels []string = []string{"host", "linkindex", "link", "type", "handle", "parent"}
+	qdisclabels []string = []string{"host", "namespace", "linkindex", "link", "type", "handle", "parent"}
 )
 
 type QdiscCollector struct {
 	logger     log.Logger
 	interf     *net.Interface
+	ns         int
 	sock       *tc.Tc
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
@@ -28,26 +29,15 @@ type QdiscCollector struct {
 	qlen       *prometheus.Desc
 }
 
-func NewQdiscCollector(interf *net.Interface, qlog log.Logger) (prometheus.Collector, error) {
+func NewQdiscCollector(ns int, interf *net.Interface, qlog log.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	qlog = log.With(qlog, "collector", "qdisc")
 	qlog.Log("msg", "making qdisc collector", "inteface", interf.Name)
 
-	// Create socket for interface to get qdiscs from
-	rtnl, err := tc.Open(&tc.Config{})
-	if err != nil {
-		qlog.Log("msg", "could not open rtnetlink socket", "err", err)
-		return nil, err
-	}
-	defer func() {
-		if err := rtnl.Close(); err != nil {
-			qlog.Log("msg", "could not close rtnetlink socket", "err", err)
-		}
-	}()
-
 	return &QdiscCollector{
 		logger: qlog,
 		interf: interf,
+		ns:     ns,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "qdisc", "bytes_total"),
 			"Qdisc byte counter",
@@ -114,7 +104,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 		qc.logger.Log("msg", "failed to fetch hostname", "err", err)
 	}
 
-	qdiscs, err := getQdiscs(uint32(qc.interf.Index))
+	qdiscs, err := getQdiscs(uint32(qc.interf.Index), qc.ns)
 	if err != nil {
 		qc.logger.Log("msg", "failed to get qdiscs", "interface", qc.interf.Name, "err", err)
 	}
@@ -129,6 +119,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue,
 			float64(qd.Stats.Bytes),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -140,6 +131,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue,
 			float64(qd.Stats.Packets),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -151,6 +143,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.GaugeValue,
 			float64(qd.Stats.Bps),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -162,6 +155,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.GaugeValue,
 			float64(qd.Stats.Pps),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -173,6 +167,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue,
 			float64(qd.Stats.Backlog),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -184,6 +179,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue,
 			float64(qd.Stats.Drops),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -195,6 +191,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue,
 			float64(qd.Stats.Overlimits),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -206,6 +203,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			prometheus.CounterValue,
 			float64(qd.Stats.Qlen),
 			host,
+			fmt.Sprintf("%d", qc.ns),
 			fmt.Sprintf("%d", qc.interf.Index),
 			qc.interf.Name,
 			qd.Kind,
@@ -215,9 +213,11 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func getQdiscs(devid uint32) ([]tc.Object, error) {
+func getQdiscs(devid uint32, ns int) ([]tc.Object, error) {
 	// Create socket for interface to get qdiscs from
-	sock, err := tc.Open(&tc.Config{})
+	sock, err := tc.Open(&tc.Config{
+		NetNS: ns,
+	})
 	if err != nil {
 		return nil, err
 	}
