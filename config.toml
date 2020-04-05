@@ -1,1 +1,7 @@
+listen-address = ":9601"
+
+[netns.0]
 interfaces = ['wlp58s0']
+
+[netns.2]
+interfaces = ['dummy01']

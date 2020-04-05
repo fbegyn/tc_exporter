@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 
@@ -13,7 +14,12 @@ import (
 )
 
 type Config struct {
-	Interfaces []string `mapstructure:"interfaces"`
+	ListenAddres string ``
+	NetNS        map[int]NS
+}
+
+type NS struct {
+	Interfaces []string
 }
 
 const (
@@ -35,36 +41,52 @@ func main() {
 	// currently the following options can be used in the configuration folder
 	// interfaces: array - array holding the dvice names
 	logger.Log("msg", "reading config file ...")
+	// Set config locations
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath("/etc/tc_exporter/")
 	viper.AddConfigPath("$HOME/.config/tc_exporter/")
 	viper.AddConfigPath(".")
+	// Set defaults
+	viper.SetDefault("listen-address", ":9704")
+	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 		} else {
 		}
 	}
+
+	fmt.Println(viper.AllKeys())
+
 	var cf Config
+	cf.ListenAddres = viper.GetString("listen-address")
 	err := viper.Unmarshal(&cf)
 	if err != nil {
 		logger.Log("level", "ERROR", "msg", "failed to read config file", "error", err)
 	}
 	logger.Log("msg", "succesfully read config file")
 
-	collector, err := tcexporter.NewTcCollector(cf.Interfaces, logger)
-	if err != nil {
-		logger.Log("msg", "failed to create TC collector", "err", err)
+	fmt.Println(cf)
+
+	fmt.Println(cf.ListenAddres)
+	collectors := make(map[int]*prometheus.Collector)
+
+	for ns, devices := range cf.NetNS {
+		collector, err := tcexporter.NewTcCollector(ns, devices.Interfaces, logger)
+		if err != nil {
+			logger.Log("msg", "failed to create TC collector", "err", err)
+		}
+		collectors[ns] = &collector
 	}
 
-	prometheus.MustRegister(collector)
+	prometheus.MustRegister(*collectors[0])
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// Start listening for HTTP connections.
-	logger.Log("msg", "starting TC exporter", "port", ":9704")
-	if err := http.ListenAndServe(":9704", mux); err != nil {
+	logger.Log("msg", "starting TC exporter", "listen-address", cf.ListenAddres)
+	if err := http.ListenAndServe(cf.ListenAddres, mux); err != nil {
 		logger.Log("msg", "cannot start TC exporter", "err", err)
 	}
 }

@@ -10,22 +10,16 @@ import (
 
 const namespace = "tc"
 
-var (
-	scrapeDurationDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "scrape", "collector_duration_seconds"),
-		"node_exporter: Duration of a collector scrape.",
-		[]string{"collector"},
-		nil,
-	)
-)
-
 type TcCollector struct {
 	logger     log.Logger
+	netns      int
 	Collectors map[string][]prometheus.Collector
 }
 
-func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collector, error) {
+func NewTcCollector(netns int, interfaces []string, logger log.Logger) (prometheus.Collector, error) {
 	// setup the logger for the collector
+	logger = log.With(logger, "netns", netns)
+
 	collectors := make(map[string][]prometheus.Collector)
 	for _, interf := range interfaces {
 		device, err := net.InterfaceByName(interf)
@@ -33,19 +27,19 @@ func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collecto
 			return nil, err
 		}
 		// Setup Qdisc collector for interface
-		qColl, err := NewQdiscCollector(0, device, logger)
+		qColl, err := NewQdiscCollector(netns, device, logger)
 		if err != nil {
 			return nil, err
 		}
 		collectors[interf] = append(collectors[interf], qColl)
 		// Setup Class collector for interface
-		cColl, err := NewClassCollector(device, logger)
+		cColl, err := NewClassCollector(netns, device, logger)
 		if err != nil {
 			return nil, err
 		}
 		collectors[interf] = append(collectors[interf], cColl)
 		// Setup Service Curve collector for interface
-		scColl, err := NewServiceCurveCollector(device, logger)
+		scColl, err := NewServiceCurveCollector(netns, device, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -54,13 +48,12 @@ func NewTcCollector(interfaces []string, logger log.Logger) (prometheus.Collecto
 
 	return &TcCollector{
 		logger:     logger,
+		netns:      netns,
 		Collectors: collectors,
 	}, nil
 }
 
 func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- scrapeDurationDesc
-
 	for _, interf := range t.Collectors {
 		for _, col := range interf {
 			col.Describe(ch)
