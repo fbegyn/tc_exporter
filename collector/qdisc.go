@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	qdisclabels []string = []string{"host", "namespace", "linkindex", "link", "type", "handle", "parent"}
+	qdisclabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
 type QdiscCollector struct {
