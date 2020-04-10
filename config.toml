@@ -1,7 +1,7 @@
 listen-address = ":9601"
 
 [netns.0]
-interfaces = ['wlp58s0']
+interfaces = ['wlp58s0','dummy01']
 
 [netns.2]
-interfaces = ['dummy01']
+interfaces = ['dummy02']

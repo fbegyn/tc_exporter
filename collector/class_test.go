@@ -23,7 +23,7 @@ func TestClassCollector(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rtnl, err := SetupDummyInterface(tt.name)
+			rtnl, err := SetupDummyInterface(tt.name, 1000)
 			if err != nil {
 				t.Fatalf("could not setup dummy interface for testing: %v", err)
 			}
@@ -33,12 +33,14 @@ func TestClassCollector(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
+			test := make(map[int][]*net.Interface)
+			test[0] = []*net.Interface{interf}
 
 			var logger log.Logger
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 			logger = log.With(logger, "test", "collector")
 
-			qc, err := NewClassCollector(interf, logger)
+			qc, err := NewClassCollector(test, logger)
 			if err != nil {
 				t.Fatalf("failed to create class collector for %s: %v", interf.Name, err)
 			}
@@ -67,7 +69,7 @@ func TestServiceCurveCollector(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup dummy interface for testing
-			rtnl, err := SetupDummyInterface(tt.name)
+			rtnl, err := SetupDummyInterface(tt.name, 1000)
 			if err != nil {
 				t.Fatalf("could not setup dummy interface for testing: %v", err)
 			}
@@ -79,6 +81,9 @@ func TestServiceCurveCollector(t *testing.T) {
 				rtnl.Link.Delete(uint32(interf.Index))
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
+
+			test := make(map[int][]*net.Interface)
+			test[0] = []*net.Interface{interf}
 
 			// Create socket for interface to get and set classes
 			sock, err := tc.Open(&tc.Config{})
@@ -196,7 +201,7 @@ func TestServiceCurveCollector(t *testing.T) {
 			}
 
 			// Create ServiceCurve collector for the class
-			qc, err := NewServiceCurveCollector(interf, logger)
+			qc, err := NewServiceCurveCollector(test, logger)
 			if err != nil {
 				rtnl.Link.Delete(uint32(interf.Index))
 				t.Fatalf("failed to create Service Curve collector for %s: %v", interf.Name, err)

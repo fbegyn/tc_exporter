@@ -16,8 +16,7 @@ var (
 
 type QdiscCollector struct {
 	logger     log.Logger
-	interf     *net.Interface
-	ns         int
+	netns      map[int][]*net.Interface
 	sock       *tc.Tc
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
@@ -29,15 +28,14 @@ type QdiscCollector struct {
 	qlen       *prometheus.Desc
 }
 
-func NewQdiscCollector(ns int, interf *net.Interface, qlog log.Logger) (prometheus.Collector, error) {
+func NewQdiscCollector(netns map[int][]*net.Interface, qlog log.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	qlog = log.With(qlog, "collector", "qdisc")
-	qlog.Log("msg", "making qdisc collector", "inteface", interf.Name)
+	qlog.Log("msg", "making qdisc collector")
 
 	return &QdiscCollector{
 		logger: qlog,
-		interf: interf,
-		ns:     ns,
+		netns:  netns,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "qdisc", "bytes_total"),
 			"Qdisc byte counter",
@@ -104,112 +102,116 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 		qc.logger.Log("msg", "failed to fetch hostname", "err", err)
 	}
 
-	qdiscs, err := getQdiscs(uint32(qc.interf.Index), qc.ns)
-	if err != nil {
-		qc.logger.Log("msg", "failed to get qdiscs", "interface", qc.interf.Name, "err", err)
-	}
+	for ns, devices := range qc.netns {
+		for _, interf := range devices {
+			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
+			if err != nil {
+				qc.logger.Log("msg", "failed to get qdiscs", "interface", interf.Name, "err", err)
+			}
 
-	for _, qd := range qdiscs {
+			for _, qd := range qdiscs {
 
-		handleMaj, handleMin := HandleStr(qd.Handle)
-		parentMaj, parentMin := HandleStr(qd.Parent)
+				handleMaj, handleMin := HandleStr(qd.Handle)
+				parentMaj, parentMin := HandleStr(qd.Parent)
 
-		ch <- prometheus.MustNewConstMetric(
-			qc.bytes,
-			prometheus.CounterValue,
-			float64(qd.Stats.Bytes),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.packets,
-			prometheus.CounterValue,
-			float64(qd.Stats.Packets),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.bps,
-			prometheus.GaugeValue,
-			float64(qd.Stats.Bps),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.pps,
-			prometheus.GaugeValue,
-			float64(qd.Stats.Pps),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.backlog,
-			prometheus.CounterValue,
-			float64(qd.Stats.Backlog),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.drops,
-			prometheus.CounterValue,
-			float64(qd.Stats.Drops),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.overlimits,
-			prometheus.CounterValue,
-			float64(qd.Stats.Overlimits),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-		ch <- prometheus.MustNewConstMetric(
-			qc.qlen,
-			prometheus.CounterValue,
-			float64(qd.Stats.Qlen),
-			host,
-			fmt.Sprintf("%d", qc.ns),
-			fmt.Sprintf("%d", qc.interf.Index),
-			qc.interf.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
+				ch <- prometheus.MustNewConstMetric(
+					qc.bytes,
+					prometheus.CounterValue,
+					float64(qd.Stats.Bytes),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.packets,
+					prometheus.CounterValue,
+					float64(qd.Stats.Packets),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.bps,
+					prometheus.GaugeValue,
+					float64(qd.Stats.Bps),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.pps,
+					prometheus.GaugeValue,
+					float64(qd.Stats.Pps),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.backlog,
+					prometheus.CounterValue,
+					float64(qd.Stats.Backlog),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.drops,
+					prometheus.CounterValue,
+					float64(qd.Stats.Drops),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.overlimits,
+					prometheus.CounterValue,
+					float64(qd.Stats.Overlimits),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					qc.qlen,
+					prometheus.CounterValue,
+					float64(qd.Stats.Qlen),
+					host,
+					fmt.Sprintf("%d", ns),
+					fmt.Sprintf("%d", interf.Index),
+					interf.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+			}
+		}
 	}
 }
 
