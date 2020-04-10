@@ -1,6 +1,6 @@
 prefix = /usr/sbin
 
-all: build
+all: package
 
 build:
 	go build -o bin/tc_exporter -ldflags "-w -s" ./cmd/tc_exporter
