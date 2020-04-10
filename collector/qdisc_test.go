@@ -20,7 +20,7 @@ func TestQdiscCollector(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rtnl, err := SetupDummyInterface(tt.name)
+			rtnl, err := SetupDummyInterface(tt.name, 1000)
 			if err != nil {
 				t.Fatalf("could not setup dummy interface for testing: %v", err)
 			}
@@ -31,11 +31,14 @@ func TestQdiscCollector(t *testing.T) {
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
 
+			test := make(map[int][]*net.Interface)
+			test[0] = []*net.Interface{interf}
+
 			var logger log.Logger
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 			logger = log.With(logger, "test", "collector")
 
-			qc, err := NewQdiscCollector(0, interf, logger)
+			qc, err := NewQdiscCollector(test, logger)
 			if err != nil {
 				t.Fatalf("failed to create qdisc collector for %s: %v", interf.Name, err)
 			}

@@ -12,39 +12,30 @@ const namespace = "tc"
 
 type TcCollector struct {
 	logger     log.Logger
-	netns      int
-	Collectors map[string][]prometheus.Collector
+	netns      map[int][]*net.Interface
+	Collectors []prometheus.Collector
 }
 
-func NewTcCollector(netns int, interfaces []string, logger log.Logger) (prometheus.Collector, error) {
-	// setup the logger for the collector
-	logger = log.With(logger, "netns", netns)
-
-	collectors := make(map[string][]prometheus.Collector)
-	for _, interf := range interfaces {
-		device, err := net.InterfaceByName(interf)
-		if err != nil {
-			return nil, err
-		}
-		// Setup Qdisc collector for interface
-		qColl, err := NewQdiscCollector(netns, device, logger)
-		if err != nil {
-			return nil, err
-		}
-		collectors[interf] = append(collectors[interf], qColl)
-		// Setup Class collector for interface
-		cColl, err := NewClassCollector(netns, device, logger)
-		if err != nil {
-			return nil, err
-		}
-		collectors[interf] = append(collectors[interf], cColl)
-		// Setup Service Curve collector for interface
-		scColl, err := NewServiceCurveCollector(netns, device, logger)
-		if err != nil {
-			return nil, err
-		}
-		collectors[interf] = append(collectors[interf], scColl)
+func NewTcCollector(netns map[int][]*net.Interface, logger log.Logger) (prometheus.Collector, error) {
+	collectors := []prometheus.Collector{}
+	// Setup Qdisc collector for interface
+	qColl, err := NewQdiscCollector(netns, logger)
+	if err != nil {
+		return nil, err
 	}
+	collectors = append(collectors, qColl)
+	// Setup Class collector for interface
+	cColl, err := NewClassCollector(netns, logger)
+	if err != nil {
+		return nil, err
+	}
+	collectors = append(collectors, cColl)
+	// Setup Service Curve collector for interface
+	scColl, err := NewServiceCurveCollector(netns, logger)
+	if err != nil {
+		return nil, err
+	}
+	collectors = append(collectors, scColl)
 
 	return &TcCollector{
 		logger:     logger,
@@ -54,30 +45,20 @@ func NewTcCollector(netns int, interfaces []string, logger log.Logger) (promethe
 }
 
 func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, interf := range t.Collectors {
-		for _, col := range interf {
-			col.Describe(ch)
-		}
+	for _, col := range t.Collectors {
+		col.Describe(ch)
 	}
 }
 
 func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
-
-	collectors := 0
-	for _, t := range t.Collectors {
-		collectors += len(t)
-	}
-
 	wg := sync.WaitGroup{}
-	wg.Add(collectors)
-	for name, colls := range t.Collectors {
-		t.logger.Log("msg", "processing scrape", "interface", name)
-		for _, coll := range colls {
-			go func(name string, c prometheus.Collector) {
-				c.Collect(ch)
-				wg.Done()
-			}(name, coll)
-		}
+	wg.Add(len(t.Collectors))
+	t.logger.Log("msg", "processing scrape")
+	for _, coll := range t.Collectors {
+		go func(c prometheus.Collector) {
+			c.Collect(ch)
+			wg.Done()
+		}(coll)
 	}
 	wg.Wait()
 }

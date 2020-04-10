@@ -30,7 +30,7 @@ func GetClasses(sock *tc.Tc, devid uint32, logger log.Logger) []tc.Object {
 }
 
 // setupDummyInterface installs a temporary dummy interface
-func SetupDummyInterface(iface string) (*rtnetlink.Conn, error) {
+func SetupDummyInterface(iface string, linkindex uint32) (*rtnetlink.Conn, error) {
 	con, err := rtnetlink.Dial(nil)
 	if err != nil {
 		return &rtnetlink.Conn{}, err
@@ -39,7 +39,7 @@ func SetupDummyInterface(iface string) (*rtnetlink.Conn, error) {
 	if err := con.Link.New(&rtnetlink.LinkMessage{
 		Family: unix.AF_UNSPEC,
 		Type:   unix.ARPHRD_NETROM,
-		Index:  1000,
+		Index:  linkindex,
 		Flags:  unix.IFF_UP,
 		Change: unix.IFF_UP,
 		Attributes: &rtnetlink.LinkAttributes{
