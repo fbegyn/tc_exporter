@@ -2,11 +2,11 @@ package tccollector
 
 import (
 	"fmt"
-	"net"
 	"os"
 
 	"github.com/florianl/go-tc"
 	"github.com/go-kit/kit/log"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -16,7 +16,7 @@ var (
 
 type QdiscCollector struct {
 	logger     log.Logger
-	netns      map[int][]*net.Interface
+	netns      map[string][]rtnetlink.LinkMessage
 	sock       *tc.Tc
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
@@ -28,7 +28,7 @@ type QdiscCollector struct {
 	qlen       *prometheus.Desc
 }
 
-func NewQdiscCollector(netns map[int][]*net.Interface, qlog log.Logger) (prometheus.Collector, error) {
+func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog log.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	qlog = log.With(qlog, "collector", "qdisc")
 	qlog.Log("msg", "making qdisc collector")
@@ -106,7 +106,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 		for _, interf := range devices {
 			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
 			if err != nil {
-				qc.logger.Log("msg", "failed to get qdiscs", "interface", interf.Name, "err", err)
+				qc.logger.Log("msg", "failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			for _, qd := range qdiscs {
@@ -119,9 +119,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(qd.Stats.Bytes),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -131,9 +131,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(qd.Stats.Packets),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -143,9 +143,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.GaugeValue,
 					float64(qd.Stats.Bps),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -155,9 +155,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.GaugeValue,
 					float64(qd.Stats.Pps),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -167,9 +167,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(qd.Stats.Backlog),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -179,9 +179,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(qd.Stats.Drops),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -191,9 +191,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(qd.Stats.Overlimits),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -203,9 +203,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(qd.Stats.Qlen),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					qd.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -215,20 +215,32 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func getQdiscs(devid uint32, ns int) ([]tc.Object, error) {
-	// Create socket for interface to get qdiscs from
-	sock, err := tc.Open(&tc.Config{
-		NetNS: ns,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := sock.Close(); err != nil {
+func getQdiscs(devid uint32, ns string) ([]tc.Object, error) {
+	var sock *tc.Tc
+	var err error
+	if ns == "default" {
+		sock, err = tc.Open(&tc.Config{})
+		if err != nil {
+			return nil, err
 		}
-	}()
+	} else {
+		f, err := os.Open("/var/run/netns/" + ns)
+		if err != nil {
+			fmt.Printf("failed to open namespace file: %v", err)
+		}
+		defer f.Close()
 
+		sock, err = tc.Open(&tc.Config{
+			NetNS: int(f.Fd()),
+		})
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+	}
+	defer sock.Close()
 	qdiscs, err := sock.Qdisc().Get()
+	fmt.Println(qdiscs)
 	if err != nil {
 		return nil, err
 	}

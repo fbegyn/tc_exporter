@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"os"
+
+	_ "github.com/opencontainers/runc/libcontainer/nsenter"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/go-kit/kit/log"
@@ -13,12 +14,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
+
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
 type Config struct {
 	ListenAddres string ``
-	NetNS        map[int]NS
+	NetNS        map[string]NS
 }
 
 type NS struct {
@@ -67,23 +69,16 @@ func main() {
 	}
 	logger.Log("msg", "succesfully read config file")
 
-	netns := make(map[int][]*net.Interface)
-	for ns, space := range cf.NetNS {
-		for _, device := range space.Interfaces {
-			con, err := getInterfaceInNS(device, ns)
-			defer con.Close()
-			interf, err := net.InterfaceByName(device)
-			if err != nil {
-				logger.Log("err", "could not get interface by name", "interface", device)
-			}
-			if interf == nil {
-				logger.Log("warn", "interface does not exist, SKIPPING IT!", "interface", device)
-				continue
-			}
-			logger.Log("msg", "add interface to ns", "interface", device, "netns", ns)
-			netns[ns] = append(netns[ns], interf)
+	netns := make(map[string][]rtnetlink.LinkMessage)
+	for ns, sp := range cf.NetNS {
+		interfaces, err := getInterfaceInNS(sp.Interfaces, ns)
+		if err != nil {
+			logger.Log("msg", "failed to get interfaces from ns", "err", err, "netns", ns)
 		}
+		netns[ns] = interfaces
 	}
+
+	fmt.Println(netns)
 
 	collector, err := tcexporter.NewTcCollector(netns, logger)
 	if err != nil {
@@ -102,22 +97,45 @@ func main() {
 	}
 }
 
-func getInterfaceInNS(interf string, ns int) (*rtnetlink.Conn, error) {
-	fmt.Printf("Dialing: netns %d and device %s\n", ns, interf)
-	con, err := rtnetlink.Dial(&netlink.Config{
-		Groups:              0,
-		NetNS:               ns,
-		DisableNSLockThread: false,
-	})
+func getInterfaceInNS(devices []string, ns string) ([]rtnetlink.LinkMessage, error) {
+
+	var con *rtnetlink.Conn
+	var err error
+	if ns == "default" {
+		con, err = rtnetlink.Dial(nil)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		f, err := os.Open("/var/run/netns/" + ns)
+		if err != nil {
+			fmt.Printf("failed to open namespace file: %v", err)
+		}
+		defer f.Close()
+
+		con, err = rtnetlink.Dial(&netlink.Config{
+			NetNS: int(f.Fd()),
+		})
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+	}
+	defer con.Close()
+
+	links, err := con.Link.List()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
-	link, _ := con.Link.List()
-	for _, l := range link {
-		fmt.Println(l.Attributes)
+	selected := make([]rtnetlink.LinkMessage, len(devices))
+	for _, link := range links {
+		for i, interf := range devices {
+			if interf == link.Attributes.Name {
+				selected[i] = link
+			}
+		}
 	}
 
-	return con, nil
+	return selected, nil
 }

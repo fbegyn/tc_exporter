@@ -2,11 +2,11 @@ package tccollector
 
 import (
 	"fmt"
-	"net"
 	"os"
 
 	"github.com/florianl/go-tc"
 	"github.com/go-kit/kit/log"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sys/unix"
 )
@@ -18,7 +18,7 @@ var (
 
 type ClassCollector struct {
 	logger     log.Logger
-	netns      map[int][]*net.Interface
+	netns      map[string][]rtnetlink.LinkMessage
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
 	bps        *prometheus.Desc
@@ -30,7 +30,7 @@ type ClassCollector struct {
 	requeues   *prometheus.Desc
 }
 
-func NewClassCollector(netns map[int][]*net.Interface, clog log.Logger) (prometheus.Collector, error) {
+func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog log.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	clog = log.With(clog, "collector", "class")
 	clog.Log("msg", "making class collector")
@@ -113,7 +113,7 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 		for _, interf := range devices {
 			classes, err := getClasses(uint32(interf.Index), ns)
 			if err != nil {
-				cc.logger.Log("msg", "failed to get classes", "interface", interf.Name, "err", err)
+				cc.logger.Log("msg", "failed to get classes", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			for _, cl := range classes {
@@ -125,9 +125,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats.Bytes),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -137,9 +137,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats.Packets),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -149,9 +149,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.GaugeValue,
 					float64(cl.Stats.Bps),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -161,9 +161,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.GaugeValue,
 					float64(cl.Stats.Pps),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -173,9 +173,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats.Backlog),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -185,9 +185,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats.Drops),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -197,9 +197,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats.Overlimits),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -209,9 +209,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats.Qlen),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -221,9 +221,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 					prometheus.CounterValue,
 					float64(cl.Stats2.Requeues),
 					host,
-					fmt.Sprintf("%d", ns),
+					ns,
 					fmt.Sprintf("%d", interf.Index),
-					interf.Name,
+					interf.Attributes.Name,
 					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -237,14 +237,14 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 
 type ServiceCurveCollector struct {
 	logger log.Logger
-	netns  map[int][]*net.Interface
+	netns  map[string][]rtnetlink.LinkMessage
 	curves map[string]*tc.ServiceCurve
 	Burst  *prometheus.Desc
 	Delay  *prometheus.Desc
 	Rate   *prometheus.Desc
 }
 
-func NewServiceCurveCollector(netns map[int][]*net.Interface, sclog log.Logger) (prometheus.Collector, error) {
+func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog log.Logger) (prometheus.Collector, error) {
 
 	sclog = log.With(sclog, "collector", "hfsc")
 	sclog.Log("msg", "making SC collector")
@@ -296,7 +296,7 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 		for _, interf := range devices {
 			classes, err := getClasses(uint32(interf.Index), ns)
 			if err != nil {
-				c.logger.Log("msg", "failed to get classes", "interface", interf.Name, "err", err)
+				c.logger.Log("msg", "failed to get classes", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			for _, cl := range classes {
@@ -318,9 +318,9 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 						prometheus.GaugeValue,
 						float64(sc.M1),
 						host,
-						fmt.Sprintf("%d", ns),
+						ns,
 						fmt.Sprintf("%d", interf.Index),
-						interf.Name,
+						interf.Attributes.Name,
 						typ,
 						fmt.Sprintf("%x:%x", handleMaj, handleMin),
 						fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -330,9 +330,9 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 						prometheus.GaugeValue,
 						float64(sc.D),
 						host,
-						fmt.Sprintf("%d", ns),
+						ns,
 						fmt.Sprintf("%d", interf.Index),
-						interf.Name,
+						interf.Attributes.Name,
 						typ,
 						fmt.Sprintf("%x:%x", handleMaj, handleMin),
 						fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -342,9 +342,9 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 						prometheus.GaugeValue,
 						float64(sc.M2),
 						host,
-						fmt.Sprintf("%d", ns),
+						ns,
 						fmt.Sprintf("%d", interf.Index),
-						interf.Name,
+						interf.Attributes.Name,
 						typ,
 						fmt.Sprintf("%x:%x", handleMaj, handleMin),
 						fmt.Sprintf("%x:%x", parentMaj, parentMin),
@@ -356,18 +356,30 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 
 }
 
-func getClasses(devid uint32, ns int) ([]tc.Object, error) {
-	// Create socket for interface to get classes from
-	sock, err := tc.Open(&tc.Config{
-		NetNS: ns,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := sock.Close(); err != nil {
+func getClasses(devid uint32, ns string) ([]tc.Object, error) {
+	var sock *tc.Tc
+	var err error
+	if ns == "default" {
+		sock, err = tc.Open(&tc.Config{})
+		if err != nil {
+			return nil, err
 		}
-	}()
+	} else {
+		f, err := os.Open("/var/run/netns/" + ns)
+		if err != nil {
+			fmt.Printf("failed to open namespace file: %v", err)
+		}
+		defer f.Close()
+
+		sock, err = tc.Open(&tc.Config{
+			NetNS: int(f.Fd()),
+		})
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+	}
+	defer sock.Close()
 	classes, err := sock.Class().Get(&tc.Msg{
 		Family:  unix.AF_UNSPEC,
 		Ifindex: devid,

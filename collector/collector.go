@@ -1,10 +1,10 @@
 package tccollector
 
 import (
-	"net"
 	"sync"
 
 	"github.com/go-kit/kit/log"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -12,11 +12,11 @@ const namespace = "tc"
 
 type TcCollector struct {
 	logger     log.Logger
-	netns      map[int][]*net.Interface
+	netns      map[string][]rtnetlink.LinkMessage
 	Collectors []prometheus.Collector
 }
 
-func NewTcCollector(netns map[int][]*net.Interface, logger log.Logger) (prometheus.Collector, error) {
+func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, logger log.Logger) (prometheus.Collector, error) {
 	collectors := []prometheus.Collector{}
 	// Setup Qdisc collector for interface
 	qColl, err := NewQdiscCollector(netns, logger)
