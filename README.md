@@ -1,5 +1,7 @@
 # WIP TC exporter
 
+[![builds.sr.ht status](https://builds.sr.ht/~fbegyn/tc_exporter.svg)](https://builds.sr.ht/~fbegyn/tc_exporter?) [![Go Report Card](https://goreportcard.com/badge/github.com/fbegyn/tc_exporter)](https://goreportcard.com/report/github.com/fbegyn/tc_exporter)
+
 `tc_exporter` is an InfluxDB/Prometheus exporter that is capable of exporting statisctics from `tc`
 through the netlink library. Current project is a WIP and documentation will expand during the
 development.

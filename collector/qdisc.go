@@ -14,6 +14,7 @@ var (
 	qdisclabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
+// QdiscCollector is the object that will collect Qdisc data for the interface
 type QdiscCollector struct {
 	logger     log.Logger
 	netns      map[string][]rtnetlink.LinkMessage
@@ -28,6 +29,7 @@ type QdiscCollector struct {
 	qlen       *prometheus.Desc
 }
 
+// NewQdiscCollector create a new QdiscCollector given a network interface
 func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog log.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	qlog = log.With(qlog, "collector", "qdisc")
@@ -79,6 +81,7 @@ func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog log.Logger
 	}, nil
 }
 
+// Describe implements Collector
 func (qc *QdiscCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 		qc.backlog,
@@ -96,6 +99,7 @@ func (qc *QdiscCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
+// Collect fetches and updates the data the collector is exporting
 func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	host, err := os.Hostname()
 	if err != nil {

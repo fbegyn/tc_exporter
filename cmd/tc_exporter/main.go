@@ -67,7 +67,7 @@ func main() {
 	if err != nil {
 		logger.Log("level", "ERROR", "msg", "failed to read config file", "error", err)
 	}
-	logger.Log("msg", "succesfully read config file")
+	logger.Log("msg", "successfully read config file")
 
 	netns := make(map[string][]rtnetlink.LinkMessage)
 	for ns, sp := range cf.NetNS {
