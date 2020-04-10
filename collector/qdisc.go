@@ -244,7 +244,6 @@ func getQdiscs(devid uint32, ns string) ([]tc.Object, error) {
 	}
 	defer sock.Close()
 	qdiscs, err := sock.Qdisc().Get()
-	fmt.Println(qdiscs)
 	if err != nil {
 		return nil, err
 	}
