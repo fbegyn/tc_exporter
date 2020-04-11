@@ -5,12 +5,9 @@ import (
 	"net/http"
 	"os"
 
-	_ "github.com/opencontainers/runc/libcontainer/nsenter"
-
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/go-kit/kit/log"
 	"github.com/jsimonetti/rtnetlink"
-	"github.com/mdlayher/netlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
@@ -98,28 +95,9 @@ func main() {
 }
 
 func getInterfaceInNS(devices []string, ns string) ([]rtnetlink.LinkMessage, error) {
-
-	var con *rtnetlink.Conn
-	var err error
-	if ns == "default" {
-		con, err = rtnetlink.Dial(nil)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		f, err := os.Open("/var/run/netns/" + ns)
-		if err != nil {
-			fmt.Printf("failed to open namespace file: %v", err)
-		}
-		defer f.Close()
-
-		con, err = rtnetlink.Dial(&netlink.Config{
-			NetNS: int(f.Fd()),
-		})
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
+	con, err := tcexporter.GetNetlinkConn(ns)
+	if err != nil {
+		return nil, err
 	}
 	defer con.Close()
 

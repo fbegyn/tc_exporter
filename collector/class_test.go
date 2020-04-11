@@ -8,6 +8,7 @@ import (
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
 	"github.com/go-kit/kit/log"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 	"golang.org/x/sys/unix"
 )
@@ -33,8 +34,8 @@ func TestClassCollector(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
-			test := make(map[int][]*net.Interface)
-			test[0] = []*net.Interface{interf}
+			test := make(map[string][]rtnetlink.LinkMessage)
+			test["default"] = []rtnetlink.LinkMessage{}
 
 			var logger log.Logger
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
@@ -82,8 +83,10 @@ func TestServiceCurveCollector(t *testing.T) {
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
 
-			test := make(map[int][]*net.Interface)
-			test[0] = []*net.Interface{interf}
+			test := make(map[string][]rtnetlink.LinkMessage)
+			con, _ := GetNetlinkConn("default")
+			links, _ := con.Link.List()
+			test["default"] = links
 
 			// Create socket for interface to get and set classes
 			sock, err := tc.Open(&tc.Config{})
