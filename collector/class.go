@@ -363,27 +363,9 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func getClasses(devid uint32, ns string) ([]tc.Object, error) {
-	var sock *tc.Tc
-	var err error
-	if ns == "default" {
-		sock, err = tc.Open(&tc.Config{})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		f, err := os.Open("/var/run/netns/" + ns)
-		if err != nil {
-			fmt.Printf("failed to open namespace file: %v", err)
-		}
-		defer f.Close()
-
-		sock, err = tc.Open(&tc.Config{
-			NetNS: int(f.Fd()),
-		})
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
+	sock, err := GetTcConn(ns)
+	if err != nil {
+		return nil, err
 	}
 	defer sock.Close()
 	classes, err := sock.Class().Get(&tc.Msg{

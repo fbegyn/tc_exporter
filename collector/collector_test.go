@@ -1,11 +1,11 @@
 package tccollector
 
 import (
-	"net"
 	"os"
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 )
 
@@ -31,15 +31,10 @@ func TestTcCollector(t *testing.T) {
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
 			logger = log.With(logger, "test", "collector")
 
-			test := make(map[int][]*net.Interface)
-			for _, device := range tt.devices {
-
-				interf, err := net.InterfaceByName(device)
-				if err != nil {
-					t.Fatalf("could not get %s interface by name", tt.name)
-				}
-				test[0] = append(test[0], interf)
-			}
+			test := make(map[string][]rtnetlink.LinkMessage)
+			con, _ := GetNetlinkConn("default")
+			links, _ := con.Link.List()
+			test["default"] = links
 
 			coll, err := NewTcCollector(test, logger)
 			if err != nil {

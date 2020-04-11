@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-kit/kit/log"
+	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 )
 
@@ -31,8 +32,10 @@ func TestQdiscCollector(t *testing.T) {
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
 
-			test := make(map[int][]*net.Interface)
-			test[0] = []*net.Interface{interf}
+			test := make(map[string][]rtnetlink.LinkMessage)
+			con, _ := GetNetlinkConn("default")
+			links, _ := con.Link.List()
+			test["default"] = links
 
 			var logger log.Logger
 			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
