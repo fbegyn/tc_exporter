@@ -1,7 +1,6 @@
 package tccollector
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/florianl/go-tc"
@@ -56,7 +55,6 @@ func GetTcConn(ns string) (sock *tc.Tc, err error) {
 			NetNS: int(f.Fd()),
 		})
 		if err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 	}
