@@ -44,7 +44,7 @@ func TestQdiscCollector(t *testing.T) {
 
 			interf, err := getLinkByName(tt.ns, tt.name)
 			if err != nil {
-				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				t.Logf("removing interface %s from %s\n", tt.name, tt.ns)
 				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
@@ -63,7 +63,7 @@ func TestQdiscCollector(t *testing.T) {
 
 			qc, err := tcexporter.NewQdiscCollector(test, logger)
 			if err != nil {
-				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				t.Logf("removing interface %s from %s\n", tt.name, tt.ns)
 				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to create qdisc collector for %s: %v", interf.Attributes.Name, err)
 			}
@@ -71,11 +71,11 @@ func TestQdiscCollector(t *testing.T) {
 			body := promtest.Collect(t, qc)
 
 			if !promtest.Lint(t, body) {
-				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				t.Logf("removing interface %s from %s\n", tt.name, tt.ns)
 				rtnl.Link.Delete(tt.linkid)
 				t.Errorf("one or more promlint errors found")
 			}
-			t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+			t.Logf("removing interface %s from %s\n", tt.name, tt.ns)
 			rtnl.Link.Delete(tt.linkid)
 		})
 	}
