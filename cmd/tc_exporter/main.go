@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"os"
+
+	"net/http/pprof"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/go-kit/kit/log"
@@ -73,8 +74,6 @@ func main() {
 		netns[ns] = interfaces
 	}
 
-	fmt.Println(netns)
-
 	collector, err := tcexporter.NewTcCollector(netns, logger)
 	if err != nil {
 		logger.Log("msg", "failed to create TC collector", "err", err)
@@ -83,6 +82,11 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	// Start listening for HTTP connections.
 	logger.Log("msg", "starting TC exporter", "listen-address", cf.ListenAddres)
