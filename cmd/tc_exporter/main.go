@@ -24,20 +24,15 @@ type NS struct {
 	Interfaces []string
 }
 
-const (
-	version = "v0.5.3"
-)
-
 func main() {
-	var ()
 	// CLI arguments parsing
-	kingpin.Version(version)
+	kingpin.Version(Version)
 	kingpin.Parse()
 
 	// Start up the logger
 	var logger log.Logger
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "version", "v0.6.0-rc0", "caller", log.DefaultCaller)
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "version", "v0.6.0-rc1", "caller", log.DefaultCaller)
 
 	// Read the data from the config file
 	// currently the following options can be used in the configuration folder
@@ -66,6 +61,9 @@ func main() {
 	}
 	logger.Log("msg", "successfully read config file")
 
+	// registering application information
+	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
+
 	netns := make(map[string][]rtnetlink.LinkMessage)
 	for ns, sp := range cf.NetNS {
 		interfaces, err := getInterfaceInNS(sp.Interfaces, ns)
@@ -81,7 +79,6 @@ func main() {
 	if err != nil {
 		logger.Log("msg", "failed to create TC collector", "err", err)
 	}
-
 	prometheus.MustRegister(collector)
 
 	mux := http.NewServeMux()
