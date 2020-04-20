@@ -20,7 +20,7 @@ func TestClassCollector(t *testing.T) {
 		name   string
 		linkid uint32
 	}{
-		{ns: "default", name: "dummydefault", linkid: 1000},
+		{ns: "default", name: "dummydefault", linkid: 999},
 		{ns: "testing01", name: "dummy01", linkid: 1000},
 		{ns: "testing02", name: "dummy1000", linkid: 1001},
 	}
@@ -28,23 +28,27 @@ func TestClassCollector(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// setup the netns for testing
-			shell(t, "ip", "netns", "add", tt.ns)
-			defer shell(t, "ip", "netns", "del", tt.ns)
+			if tt.ns != "default" {
+				shell(t, "ip", "netns", "add", tt.ns)
+				defer shell(t, "ip", "netns", "del", tt.ns)
 
-			f, err := os.Open("/var/run/netns/" + tt.ns)
-			if err != nil {
-				t.Fatalf("failed to open namespace file: %v", err)
+				f, err := os.Open("/var/run/netns/" + tt.ns)
+				if err != nil {
+					t.Fatalf("failed to open namespace file: %v", err)
+				}
+				defer f.Close()
 			}
-			defer f.Close()
 
 			rtnl, err := setupDummyInterface(t, tt.ns, tt.name, tt.linkid)
 			if err != nil {
-				t.Fatalf("could not setup dummy interface for testing: %v", err)
+				t.Fatalf("could not setup %s interface for %s: %v", tt.name, tt.ns, err)
 			}
 			defer rtnl.Close()
 
 			interf, err := getLinkByName(tt.ns, tt.name)
 			if err != nil {
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
 			test := make(map[string][]rtnetlink.LinkMessage)
@@ -61,15 +65,18 @@ func TestClassCollector(t *testing.T) {
 
 			qc, err := tcexporter.NewClassCollector(test, logger)
 			if err != nil {
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to create class collector for %s: %v", interf.Attributes.Name, err)
 			}
 
 			body := promtest.Collect(t, qc)
-
 			if !promtest.Lint(t, body) {
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Errorf("one or more promlint errors found")
 			}
-
+			t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
 			rtnl.Link.Delete(tt.linkid)
 		})
 	}
@@ -104,14 +111,15 @@ func TestServiceCurveCollector(t *testing.T) {
 			// Setup dummy interface for testing
 			rtnl, err := setupDummyInterface(t, tt.ns, tt.name, tt.linkid)
 			if err != nil {
-				t.Fatalf("could not setup dummy interface for testing: %v", err)
+				t.Fatalf("could not setup %s interface for %s: %v", tt.name, tt.ns, err)
 			}
 			defer rtnl.Close()
 
 			// Fetch the dummy interface
 			interf, err := getLinkByName(tt.ns, tt.name)
 			if err != nil {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
 
@@ -123,12 +131,14 @@ func TestServiceCurveCollector(t *testing.T) {
 			// Create socket for interface to get and set classes
 			sock, err := tcexporter.GetTcConn(tt.ns)
 			if err != nil {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("could not open rtnetlink socket: %v", err)
 			}
 			defer func() {
 				if err := sock.Close(); err != nil {
-					rtnl.Link.Delete(uint32(interf.Index))
+					t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+					rtnl.Link.Delete(tt.linkid)
 					t.Fatalf("could not close rtnetlink socket: %v", err)
 				}
 			}()
@@ -163,7 +173,8 @@ func TestServiceCurveCollector(t *testing.T) {
 				},
 			})
 			if err != nil {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to add HFSC qdisc: %v", err)
 			}
 
@@ -199,7 +210,8 @@ func TestServiceCurveCollector(t *testing.T) {
 				},
 			})
 			if err != nil {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to add HFSC class: %v", err)
 			}
 
@@ -214,7 +226,8 @@ func TestServiceCurveCollector(t *testing.T) {
 				Ifindex: uint32(interf.Index),
 			})
 			if err != nil {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to get classes for %s: %v", interf.Attributes.Name, err)
 			}
 
@@ -231,25 +244,29 @@ func TestServiceCurveCollector(t *testing.T) {
 			}
 
 			if !found {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to find HFSC class")
 			}
 
 			// Create ServiceCurve collector for the class
 			qc, err := tcexporter.NewServiceCurveCollector(test, logger)
 			if err != nil {
-				rtnl.Link.Delete(uint32(interf.Index))
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Fatalf("failed to create Service Curve collector for %s: %v", interf.Attributes.Name, err)
 			}
 
 			// Check if the exporter returns data on the call
 			body := promtest.Collect(t, qc)
+
 			// Check if the returned body adheres to the Prometheus style
 			if !promtest.Lint(t, body) {
+				t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
+				rtnl.Link.Delete(tt.linkid)
 				t.Errorf("one or more promlint errors found")
 			}
-
-			// Clean up dummy interface
+			t.Logf("removing dummy interface %s from %s\n", tt.name, tt.ns)
 			rtnl.Link.Delete(tt.linkid)
 		})
 	}
