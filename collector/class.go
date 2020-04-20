@@ -42,47 +42,47 @@ func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog log.Logger
 		netns:  netns,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "bytes_total"),
-			"Qdisc byte counter",
+			"Class counter",
 			classlabels, nil,
 		),
 		packets: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "packets_total"),
-			"Qdisc packet counter",
+			"Class packet counter",
 			classlabels, nil,
 		),
 		bps: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "bps"),
-			"Qdisc byte rate",
+			"Class byte rate",
 			classlabels, nil,
 		),
 		pps: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "pps"),
-			"Qdisc packet rate",
+			"Class packet rate",
 			classlabels, nil,
 		),
 		backlog: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "backlog_total"),
-			"Qdisc queue backlog",
+			"Class queue backlog",
 			classlabels, nil,
 		),
 		drops: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "drops_total"),
-			"Qdisc queue drops",
+			"Class queue drops",
 			classlabels, nil,
 		),
 		overlimits: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "overlimits_total"),
-			"Qdisc queue overlimits",
+			"Class queue overlimits",
 			classlabels, nil,
 		),
 		qlen: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "qlen_total"),
-			"Qdisc queue length",
+			"Class queue length",
 			classlabels, nil,
 		),
 		requeues: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "requeque_total"),
-			"Qdisc requeque counter",
+			"Class requeque counter",
 			classlabels, nil,
 		),
 	}, nil
@@ -99,6 +99,7 @@ func (cc *ClassCollector) Describe(ch chan<- *prometheus.Desc) {
 		cc.overlimits,
 		cc.pps,
 		cc.qlen,
+		cc.requeues,
 	}
 
 	for _, d := range ds {

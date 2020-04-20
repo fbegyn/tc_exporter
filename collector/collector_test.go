@@ -23,6 +23,8 @@ func TestTcCollector(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not setup dummy interface for testing: %v", err)
 	}
+	defer rtnl1.Link.Delete(1001)
+	defer rtnl2.Link.Delete(1002)
 	defer rtnl1.Close()
 	defer rtnl2.Close()
 
@@ -62,6 +64,4 @@ func TestTcCollector(t *testing.T) {
 
 		})
 	}
-	rtnl1.Link.Delete(1000)
-	rtnl2.Link.Delete(1001)
 }
