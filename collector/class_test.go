@@ -20,6 +20,7 @@ func TestClassCollector(t *testing.T) {
 		name   string
 		linkid uint32
 	}{
+		{ns: "default", name: "dummydefault", linkid: 1000},
 		{ns: "testing01", name: "dummy01", linkid: 1000},
 		{ns: "testing02", name: "dummy1000", linkid: 1001},
 	}

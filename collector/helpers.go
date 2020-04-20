@@ -24,7 +24,6 @@ func GetNetlinkConn(ns string) (con *rtnetlink.Conn, err error) {
 	} else {
 		f, err := os.Open("/var/run/netns/" + ns)
 		if err != nil {
-			fmt.Printf("failed to open namespace file: %v", err)
 			return nil, err
 		}
 		defer f.Close()
@@ -49,7 +48,7 @@ func GetTcConn(ns string) (sock *tc.Tc, err error) {
 	} else {
 		f, err := os.Open("/var/run/netns/" + ns)
 		if err != nil {
-			fmt.Printf("failed to open namespace file: %v", err)
+			return nil, err
 		}
 		defer f.Close()
 
