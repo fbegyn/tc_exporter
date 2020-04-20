@@ -1,17 +1,25 @@
-package tccollector
+package tccollector_test
 
 import (
 	"os"
 	"testing"
 
+	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/go-kit/kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 )
 
 func TestTcCollector(t *testing.T) {
-	rtnl1, err := SetupDummyInterface("dummy01", 1000)
-	rtnl2, err := SetupDummyInterface("dummy02", 1001)
+
+	// setup the netns for testing
+	shell(t, "ip", "netns", "add", "testing01")
+	defer shell(t, "ip", "netns", "del", "testing01")
+	shell(t, "ip", "netns", "add", "testing02")
+	defer shell(t, "ip", "netns", "del", "testing02")
+
+	rtnl1, err := setupDummyInterface(t, "testing01", "dummy01", 1000)
+	rtnl2, err := setupDummyInterface(t, "testing02", "dummy02", 1001)
 	if err != nil {
 		t.Fatalf("could not setup dummy interface for testing: %v", err)
 	}
@@ -32,11 +40,17 @@ func TestTcCollector(t *testing.T) {
 			logger = log.With(logger, "test", "collector")
 
 			test := make(map[string][]rtnetlink.LinkMessage)
-			con, _ := GetNetlinkConn("default")
+			con, _ := tcexporter.GetNetlinkConn("default")
 			links, _ := con.Link.List()
 			test["default"] = links
+			con, _ = tcexporter.GetNetlinkConn("testing01")
+			links, _ = con.Link.List()
+			test["testing01"] = links
+			con, _ = tcexporter.GetNetlinkConn("testing02")
+			links, _ = con.Link.List()
+			test["testing02"] = links
 
-			coll, err := NewTcCollector(test, logger)
+			coll, err := tcexporter.NewTcCollector(test, logger)
 			if err != nil {
 				t.Fatalf("failed to create TC collector: %v", err)
 			}
