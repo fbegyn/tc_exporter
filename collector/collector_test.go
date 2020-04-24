@@ -11,7 +11,7 @@ import (
 )
 
 func TestTcCollector(t *testing.T) {
-
+	// TODO: rework the test so it makes use of an array of tests (easier to expand an adjust)
 	// setup the netns for testing
 	shell(t, "ip", "netns", "add", "testing01")
 	defer shell(t, "ip", "netns", "del", "testing01")

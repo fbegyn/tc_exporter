@@ -99,7 +99,7 @@ func TestClassCollector(t *testing.T) {
 // TestServiceCurveCollector tests out the creation and polling of a ServiceCurveCollector. It
 // rquires some more work because we need to set up a class that actually uses a Service curve
 func TestServiceCurveCollector(t *testing.T) {
-
+	// Define the test cases for the service collector
 	tests := []struct {
 		ns     string
 		name   string
@@ -115,7 +115,9 @@ func TestServiceCurveCollector(t *testing.T) {
 			// setup the netns for testing
 			if tt.ns != "default" {
 				shell(t, "ip", "netns", "add", tt.ns)
+				// delete the netns when it is no longer needed
 				defer shell(t, "ip", "netns", "del", tt.ns)
+				// check if the netns was actually created
 				f, err := os.Open("/var/run/netns/" + tt.ns)
 				if err != nil {
 					t.Fatalf("failed to open namespace file: %v", err)
@@ -138,6 +140,7 @@ func TestServiceCurveCollector(t *testing.T) {
 				t.Fatalf("could not get %s interface by name", tt.name)
 			}
 
+			// create the test "config"
 			test := make(map[string][]rtnetlink.LinkMessage)
 			con, _ := tcexporter.GetNetlinkConn("default")
 			links, _ := con.Link.List()
@@ -158,7 +161,8 @@ func TestServiceCurveCollector(t *testing.T) {
 				}
 			}()
 
-			// Add HFSC qdisc
+			// Since the interface spawns with the default class, we need to add an HFSC class to the
+			// interface for this to work. To add an HFSC class, we first need to add an HFSC qdisc
 			qmsg := tc.Msg{
 				Family:  unix.AF_UNSPEC,
 				Ifindex: uint32(interf.Index),
@@ -193,7 +197,7 @@ func TestServiceCurveCollector(t *testing.T) {
 				t.Fatalf("failed to add HFSC qdisc: %v", err)
 			}
 
-			// Add hfsc Class
+			// After the HFSC qdisc has been created, we can add the HFSC class
 			cmsg := tc.Msg{
 				Family:  unix.AF_UNSPEC,
 				Ifindex: uint32(interf.Index),
