@@ -35,6 +35,8 @@ func setupDummyInterface(t *testing.T, ns, iface string, linkindex uint32) (*rtn
 	return con, nil
 }
 
+// getLinkByName fetches an interface from a netns based on the name. This is needed because the
+// net.getInterfaceByName does not work for other netns
 func getLinkByName(ns, link string) (rtnetlink.LinkMessage, error) {
 	con, err := tcexporter.GetNetlinkConn(ns)
 	if err != nil {

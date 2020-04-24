@@ -1,7 +1,7 @@
-listen-address = ":9601"
+listen-address = ":9704"
 
 [netns.default]
-interfaces = ['wlp58s0','dummy01']
+interfaces = ['eno1','dummy01']
 
 [netns.testing]
 interfaces = ['dummy02']

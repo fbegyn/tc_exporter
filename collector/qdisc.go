@@ -101,20 +101,23 @@ func (qc *QdiscCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches and updates the data the collector is exporting
 func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
+	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
 		qc.logger.Log("msg", "failed to fetch hostname", "err", err)
 	}
 
+	// iterate through the netns and devices
 	for ns, devices := range qc.netns {
 		for _, interf := range devices {
+			// fetch all the the qdisc for this interface
 			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
 			if err != nil {
 				qc.logger.Log("msg", "failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
 
+			// iterate through all the qdiscs and sent the data to the prometheus metric channel
 			for _, qd := range qdiscs {
-
 				handleMaj, handleMin := HandleStr(qd.Handle)
 				parentMaj, parentMin := HandleStr(qd.Parent)
 
@@ -219,6 +222,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// getQdiscs fetches all qdiscs for a pecified interface in the netns
 func getQdiscs(devid uint32, ns string) ([]tc.Object, error) {
 	sock, err := GetTcConn(ns)
 	if err != nil {
