@@ -33,7 +33,7 @@ func main() {
 	// Start up the logger
 	var logger log.Logger
 	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "version", "v0.6.0-rc1", "caller", log.DefaultCaller)
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "version", Version, "caller", log.DefaultCaller)
 
 	// Read the data from the config file
 	// currently the following options can be used in the configuration folder
