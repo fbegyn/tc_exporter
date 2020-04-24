@@ -1,7 +1,7 @@
 name: "tc-exporter"
 arch: "amd64"
 platform: "linux"
-version: "v0.6.0-rc0"
+version: "v0.6.0"
 section: "default"
 priority: "extra"
 maintainer: "Francis Begyn <francis@begyn.be>"
