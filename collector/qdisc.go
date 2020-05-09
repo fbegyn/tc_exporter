@@ -18,7 +18,6 @@ var (
 type QdiscCollector struct {
 	logger     log.Logger
 	netns      map[string][]rtnetlink.LinkMessage
-	sock       *tc.Tc
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
 	bps        *prometheus.Desc

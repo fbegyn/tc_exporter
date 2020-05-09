@@ -19,6 +19,9 @@ func TestTcCollector(t *testing.T) {
 	defer shell(t, "ip", "netns", "del", "testing02")
 
 	rtnl1, err := setupDummyInterface(t, "testing01", "dummy01", 1000)
+	if err != nil {
+		t.Fatalf("could not setup dummy interface for testing: %v", err)
+	}
 	rtnl2, err := setupDummyInterface(t, "testing02", "dummy02", 1001)
 	if err != nil {
 		t.Fatalf("could not setup dummy interface for testing: %v", err)
