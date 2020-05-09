@@ -50,7 +50,9 @@ func main() {
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			logger.Log("level","ERROR","msg","could not find the config file")
 		} else {
+			logger.Log("level","ERROR","msg","something went wrong while reading the config","err",err)
 		}
 	}
 
