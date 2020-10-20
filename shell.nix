@@ -4,5 +4,6 @@ in
 pkgs.mkShell {
   buildInputs = with pkgs; [
     go
+    nfpm
   ];
 }
