@@ -10,12 +10,15 @@ description: |
 vendor: "Francis"
 homepage: "https://github.com/fbegyn/tc_exporter"
 license: "MIT"
-bindir: "/usr/local/bin"
-files:
-  ./tc_exporter.service: "/etc/systemd/system/tc_exporter.service"
-  ./bin/tc_exporter: "/usr/local/bin/tc_exporter"
-config_files:
-  ./config.toml: "/etc/tc_exporter/config.toml"
+contents:
+  - src: ./bin/tc_exporter
+    dst: /usr/local/bin/tc_exporter
+  - src: ./tc_exporter.service
+    dst: /etc/systemd/system/tc_exporter.service
+    type: config
+  - src: ./config.toml
+    dst: /etc/tc_exporter/config.toml
+    type: config
 overrides:
   rpm:
     scripts:
