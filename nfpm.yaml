@@ -1,7 +1,7 @@
 name: "tc-exporter"
 arch: "amd64"
 platform: "linux"
-version: "v0.6.0"
+version: "v0.7.0"
 section: "default"
 priority: "extra"
 maintainer: "Francis Begyn <francis@begyn.be>"
@@ -10,19 +10,15 @@ description: |
 vendor: "Francis"
 homepage: "https://github.com/fbegyn/tc_exporter"
 license: "MIT"
-bindir: "/usr/local/bin"
-files:
-  ./tc_exporter.service: "/etc/systemd/system/tc_exporter.service"
-  ./bin/tc_exporter: "/usr/local/bin/tc_exporter"
-config_files:
-  ./config.toml: "/etc/tc_exporter/config.toml"
-overrides:
-  rpm:
-    scripts:
-      preinstall: ./scripts/preinstall.sh
-      postremove: ./scripts/postremove.sh
-  deb:
-    scripts:
-      postinstall: ./scripts/postinstall.sh
-      preremove: ./scripts/preremove.sh
-      postremove: ./scripts/postremove.sh
+contents:
+  - src: ./tc_exporter.service
+    dst: /etc/systemd/system/tc_exporter.service
+  - src: ./bin/tc_exporter
+    dst: /usr/local/bin/tc_exporter
+  - src: ./config.toml
+    dst: /etc/tc_exporter/config.toml
+    type: config|noreplace
+scripts:
+  postinstall: ./scripts/postinstall.sh
+  preremove: ./scripts/preremove.sh
+  postremove: ./scripts/postremove.sh

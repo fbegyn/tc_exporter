@@ -1,3 +1,4 @@
 bin/
 tags
 *.deb
+*.rpm
