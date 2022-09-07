@@ -14,3 +14,4 @@ clean:
 
 package: build
 	nfpm pkg --target tc_exporter.deb
+	nfpm pkg --target tc_exporter.rpm
