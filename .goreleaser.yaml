@@ -1,0 +1,58 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    main: ./cmd/tc_exporter
+archives:
+  - replacements:
+      darwin: Darwin
+      linux: Linux
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+nfpms:
+  - package_name: "tc-exporter"
+    section: "default"
+    priority: "extra"
+    maintainer: "Francis Begyn <francis@begyn.be>"
+    description: |
+      tc_exporter is a Prometheus exporter that aims to expose tc data.
+    homepage: "https://github.com/fbegyn/tc_exporter"
+    license: "MIT"
+    contents:
+      - src: ./tc_exporter.service
+        dst: /etc/systemd/system/tc_exporter.service
+      - src: ./bin/tc_exporter
+        dst: /usr/local/bin/tc_exporter
+      - src: ./config.toml
+        dst: /etc/tc_exporter/config.toml
+        type: config|noreplace
+    scripts:
+      postinstall: ./scripts/postinstall.sh
+      preremove: ./scripts/preremove.sh
+      postremove: ./scripts/postremove.sh
+    formats:
+      - apk
+      - deb
+      - rpm
+

@@ -1,4 +1,7 @@
 bin/
+dist/
 tags
 *.deb
 *.rpm
+
+dist/
