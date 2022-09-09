@@ -39,11 +39,10 @@ nfpms:
       tc_exporter is a Prometheus exporter that aims to expose tc data.
     homepage: "https://github.com/fbegyn/tc_exporter"
     license: "MIT"
+    bindir: /usr/local/bin
     contents:
       - src: ./tc_exporter.service
         dst: /etc/systemd/system/tc_exporter.service
-      - src: ./bin/tc_exporter
-        dst: /usr/local/bin/tc_exporter
       - src: ./config.toml
         dst: /etc/tc_exporter/config.toml
         type: config|noreplace
