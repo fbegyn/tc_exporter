@@ -1,10 +1,10 @@
 module github.com/fbegyn/tc_exporter
 
-go 1.19
+go 1.18
 
 require (
 	github.com/florianl/go-tc v0.4.1
-	github.com/go-kit/kit v0.12.0
+	github.com/go-kit/log v0.2.1
 	github.com/jsimonetti/rtnetlink v1.2.3
 	github.com/mdlayher/netlink v1.6.2
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
@@ -20,7 +20,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
@@ -35,6 +34,7 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/prometheus/prometheus v2.5.0+incompatible // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
