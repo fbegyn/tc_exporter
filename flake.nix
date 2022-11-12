@@ -27,9 +27,9 @@
           pkgs.go
           pkgs.gofumpt
           pkgs.gotools
+          pkgs.go-tools
           pkgs.gotestsum
           pkgs.golangci-lint
-          pkgs.staticcheck
           pkgs.git
           pkgs.nix
           pkgs.nfpm
