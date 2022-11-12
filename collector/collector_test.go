@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
-	"github.com/go-kit/kit/log"
+        "github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 )

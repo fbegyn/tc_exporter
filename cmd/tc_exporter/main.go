@@ -7,7 +7,7 @@ import (
 	"net/http/pprof"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
