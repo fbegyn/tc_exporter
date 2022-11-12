@@ -3,7 +3,7 @@ let
 in
 pkgs.mkShell {
   buildInputs = with pkgs; [
-    go
+    go_1_19
     nfpm
   ];
 }
