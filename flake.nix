@@ -38,6 +38,8 @@
         CGO_ENABLED = 0;
         doCheck = false;
         checkPhase = ''
+          staticcheck ./cmd/tc_exporter/
+          staticcheck ./collector/
           go test -exec sudo ./collector/ -v
         '';
         checkInputs = [
