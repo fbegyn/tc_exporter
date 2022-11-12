@@ -7,7 +7,7 @@ import (
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
-	"github.com/go-kit/kit/log"
+        "github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 	"golang.org/x/sys/unix"

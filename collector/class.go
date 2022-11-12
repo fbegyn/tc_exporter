@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/florianl/go-tc"
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sys/unix"
