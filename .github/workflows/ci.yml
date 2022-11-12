@@ -1,19 +1,37 @@
-name: goreleaser
+name: CI
 
 on:
   push:
-    # run only against tags
-    tags:
-      - '*'
+    branches:
+      - main
 
 permissions:
   contents: write
   packages: write
-  # issues: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch --force --tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Test collector
+        run: go test -exec sudo -v ./collector/
+
   goreleaser:
     runs-on: ubuntu-latest
+    needs: [test]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
