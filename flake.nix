@@ -20,14 +20,42 @@
         config = import ./go.nix;
       };
     in rec {
-      packages = import ./packages.nix { inherit pkgs;};
-      defaultPackage = packages.tc_exporter;
+      defaultPackage = pkgs.buildGoModule {
+        name = "tc_exporter";
+        src = pkgs.stdenv.mkDerivation {
+          name = "gosrc";
+          srcs = [./go.mod ./go.sum ./cmd ./collector ./scripts];
+          phases = "installPhase";
+          installPhase = ''
+            mkdir $out
+            for src in $srcs; do
+              for srcFile in $src; do
+                cp -r $srcFile $out/$(stripHash $srcFile)
+              done
+            done
+          '';
+        };
+        CGO_ENABLED = 0;
+        doCheck = false;
+        checkPhase = ''
+          go test -exec sudo ./collector/ -v
+        '';
+        checkInputs = [
+          pkgs.iproute2
+        ];
+        vendorSha256 = "sha256-nNHmEAmrpC/hS3KOyhxsHyWdH7q4YCjQLD7GOegGMd0=";
+        subPackages = [];
+        ldflags = [
+          "-s" "-w"
+        ];
+      };
       devShell = pkgs.mkShell rec {
         buildInputs = [
           pkgs.go
           pkgs.gofumpt
           pkgs.gotools
           pkgs.go-tools
+          pkgs.iproute2
           pkgs.gotestsum
           pkgs.golangci-lint
           pkgs.git
