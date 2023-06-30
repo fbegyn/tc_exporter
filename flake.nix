@@ -17,7 +17,6 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
         inherit system;
-        config = import ./go.nix;
       };
     in rec {
       defaultPackage = pkgs.buildGoModule {
@@ -51,15 +50,12 @@
           "-s" "-w"
         ];
       };
-      devShell = pkgs.mkShell rec {
+      devShells.default = pkgs.mkShell rec {
         buildInputs = [
           pkgs.go
           pkgs.gofumpt
-          pkgs.gotools
           pkgs.go-tools
           pkgs.iproute2
-          pkgs.gotestsum
-          pkgs.golangci-lint
           pkgs.git
           pkgs.nix
           pkgs.nfpm
