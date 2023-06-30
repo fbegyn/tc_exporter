@@ -1,7 +1,4 @@
 listen-address = ":9704"
 
 [netns.default]
-interfaces = ['enp12s0','dummy01']
-
-[netns.testing]
-interfaces = ['dummy02']
+interfaces = ['eth0']
