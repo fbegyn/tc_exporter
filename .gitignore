@@ -4,5 +4,8 @@ tags
 *.deb
 *.rpm
 
+tc_exporter
 dist/
 result
+
+.direnv
