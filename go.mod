@@ -1,6 +1,6 @@
 module github.com/fbegyn/tc_exporter
 
-go 1.20
+go 1.19
 
 require (
 	github.com/florianl/go-tc v0.4.2
