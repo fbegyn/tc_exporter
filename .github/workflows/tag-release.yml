@@ -1,4 +1,4 @@
-name: relase-tags
+name: release-tags
 
 on:
   push:
