@@ -1,13 +1,13 @@
 package tccollector_test
 
 import (
+	"log/slog"
 	"os"
 	"testing"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/florianl/go-tc"
 	"github.com/florianl/go-tc/core"
-        "github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 	"golang.org/x/sys/unix"
@@ -70,9 +70,8 @@ func TestClassCollector(t *testing.T) {
 			links, _ = con.Link.List()
 			test[tt.ns] = links
 
-			var logger log.Logger
-			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-			logger = log.With(logger, "test", "collector")
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			logger = logger.With("test", "class")
 
 			// Create a ClassCollector with the test "config"
 			qc, err := tcexporter.NewClassCollector(test, logger)
@@ -194,7 +193,7 @@ func TestServiceCurveCollector(t *testing.T) {
 			if err != nil {
 				t.Logf("removing interface %s from %s\n", tt.name, tt.ns)
 				rtnl.Link.Delete(tt.linkid)
-				t.Fatalf("failed to add HFSC qdisc: %v", err)
+				t.Fatalf("failed to create HFSC qdisc: %v", err)
 			}
 
 			// After the HFSC qdisc has been created, we can add the HFSC class
@@ -235,9 +234,8 @@ func TestServiceCurveCollector(t *testing.T) {
 			}
 
 			// Setup a logger for the test collector
-			var logger log.Logger
-			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-			logger = log.With(logger, "test", "collector")
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			logger = logger.With("test", "class")
 
 			// Fetch classes and select a HFSC class
 			classes, err := sock.Class().Get(&tc.Msg{
@@ -257,7 +255,7 @@ func TestServiceCurveCollector(t *testing.T) {
 				if c.Kind == "hfsc" {
 					found = true
 					cl = c
-					logger.Log("msg", "found HFSC class", "class", cl.Kind)
+					logger.Info("found HFSC class", "class", cl.Kind)
 					break
 				}
 			}

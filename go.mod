@@ -1,10 +1,9 @@
 module github.com/fbegyn/tc_exporter
 
-go 1.19
+go 1.21
 
 require (
 	github.com/florianl/go-tc v0.4.2
-	github.com/go-kit/log v0.2.1
 	github.com/jsimonetti/rtnetlink v1.3.3
 	github.com/mdlayher/netlink v1.7.2
 	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
@@ -20,7 +19,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

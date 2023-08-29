@@ -1,13 +1,13 @@
 package main
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 
 	"net/http/pprof"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
-	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -31,14 +31,12 @@ func main() {
 	kingpin.Parse()
 
 	// Start up the logger
-	var logger log.Logger
-	logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "version", Version, "caller", log.DefaultCaller)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// Read the data from the config file
 	// currently the following options can be used in the configuration folder
 	// interfaces: array - array holding the dvice names
-	logger.Log("msg", "reading config file ...")
+	logger.Info("reading config file")
 	// Set config locations
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
@@ -50,9 +48,9 @@ func main() {
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logger.Log("level", "ERROR", "msg", "could not find the config file")
+			logger.Error("could not find the config file")
 		} else {
-			logger.Log("level", "ERROR", "msg", "something went wrong while reading the config", "err", err)
+			logger.Error("something went wrong while reading the config", "err", err)
 		}
 	}
 
@@ -60,9 +58,9 @@ func main() {
 	cf.ListenAddres = viper.GetString("listen-address")
 	err := viper.Unmarshal(&cf)
 	if err != nil {
-		logger.Log("level", "ERROR", "msg", "failed to read config file", "error", err)
+		logger.Error("failed to read config file", "error", err)
 	}
-	logger.Log("msg", "successfully read config file")
+	logger.Info("successfully read config file")
 
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
@@ -71,14 +69,14 @@ func main() {
 	for ns, sp := range cf.NetNS {
 		interfaces, err := getInterfaceInNS(sp.Interfaces, ns)
 		if err != nil {
-			logger.Log("msg", "failed to get interfaces from ns", "err", err, "netns", ns)
+			logger.Error("failed to get interfaces from ns", "err", err, "netns", ns)
 		}
 		netns[ns] = interfaces
 	}
 
 	collector, err := tcexporter.NewTcCollector(netns, logger)
 	if err != nil {
-		logger.Log("msg", "failed to create TC collector", "err", err)
+		logger.Error("msg", "failed to create TC collector", "err", err)
 	}
 	prometheus.MustRegister(collector)
 
@@ -88,9 +86,9 @@ func main() {
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 
 	// Start listening for HTTP connections.
-	logger.Log("msg", "starting TC exporter", "listen-address", cf.ListenAddres)
+	logger.Info("starting TC exporter", "listen-address", cf.ListenAddres)
 	if err := http.ListenAndServe(cf.ListenAddres, mux); err != nil {
-		logger.Log("msg", "cannot start TC exporter", "err", err)
+		logger.Error("msg", "cannot start TC exporter", "err", err)
 	}
 }
 
