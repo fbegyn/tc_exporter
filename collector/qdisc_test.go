@@ -1,11 +1,11 @@
 package tccollector_test
 
 import (
+	"log/slog"
 	"os"
 	"testing"
 
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
-	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/promtest"
 )
@@ -57,9 +57,8 @@ func TestQdiscCollector(t *testing.T) {
 			links, _ = con.Link.List()
 			test[tt.ns] = links
 
-			var logger log.Logger
-			logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
-			logger = log.With(logger, "test", "collector")
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			logger = logger.With("test", "qdisc")
 
 			qc, err := tcexporter.NewQdiscCollector(test, logger)
 			if err != nil {

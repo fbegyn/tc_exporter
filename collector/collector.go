@@ -1,9 +1,9 @@
 package tccollector
 
 import (
+	"log/slog"
 	"sync"
 
-	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -12,13 +12,13 @@ const namespace = "tc"
 
 // TcCollector is the object that will collect TC data for the interface
 type TcCollector struct {
-	logger     log.Logger
+	logger     slog.Logger
 	netns      map[string][]rtnetlink.LinkMessage
 	Collectors []prometheus.Collector
 }
 
 // NewTcCollector create a new TcCollector given a network interface
-func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, logger log.Logger) (prometheus.Collector, error) {
+func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, logger *slog.Logger) (prometheus.Collector, error) {
 	collectors := []prometheus.Collector{}
 	// Setup Qdisc collector for interface
 	qColl, err := NewQdiscCollector(netns, logger)
@@ -40,7 +40,7 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, logger log.Logger)
 	collectors = append(collectors, scColl)
 
 	return &TcCollector{
-		logger:     logger,
+		logger:     *logger,
 		netns:      netns,
 		Collectors: collectors,
 	}, nil
@@ -57,7 +57,7 @@ func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
 func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(t.Collectors))
-	t.logger.Log("msg", "processing scrape")
+	t.logger.Info("processing scrape")
 	for _, coll := range t.Collectors {
 		go func(c prometheus.Collector) {
 			c.Collect(ch)

@@ -2,10 +2,10 @@ package tccollector
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/florianl/go-tc"
-	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -16,7 +16,7 @@ var (
 
 // QdiscCollector is the object that will collect Qdisc data for the interface
 type QdiscCollector struct {
-	logger     log.Logger
+	logger     slog.Logger
 	netns      map[string][]rtnetlink.LinkMessage
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
@@ -29,13 +29,13 @@ type QdiscCollector struct {
 }
 
 // NewQdiscCollector create a new QdiscCollector given a network interface
-func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog log.Logger) (prometheus.Collector, error) {
+func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
-	qlog = log.With(qlog, "collector", "qdisc")
-	qlog.Log("msg", "making qdisc collector")
+	qlog = qlog.With("collector", "qdisc")
+	qlog.Info("making qdisc collector")
 
 	return &QdiscCollector{
-		logger: qlog,
+		logger: *qlog,
 		netns:  netns,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "qdisc", "bytes_total"),
@@ -103,7 +103,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
-		qc.logger.Log("msg", "failed to fetch hostname", "err", err)
+		qc.logger.Error("failed to fetch hostname", "err", err)
 	}
 
 	// iterate through the netns and devices
@@ -112,7 +112,7 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			// fetch all the the qdisc for this interface
 			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
 			if err != nil {
-				qc.logger.Log("msg", "failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+				qc.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel

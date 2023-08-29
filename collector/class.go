@@ -2,10 +2,10 @@ package tccollector
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/florianl/go-tc"
-	"github.com/go-kit/log"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sys/unix"
@@ -19,7 +19,7 @@ var (
 // ClassCollector is the object that will collect Class data for the interface
 // It is a basic reperesentation of the Stats and Stats2 struct of iproute
 type ClassCollector struct {
-	logger     log.Logger
+	logger     slog.Logger
 	netns      map[string][]rtnetlink.LinkMessage
 	bytes      *prometheus.Desc
 	packets    *prometheus.Desc
@@ -33,13 +33,13 @@ type ClassCollector struct {
 }
 
 // NewClassCollector create a new ClassCollector given a network interface
-func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog log.Logger) (prometheus.Collector, error) {
+func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for the class collector
-	clog = log.With(clog, "collector", "class")
-	clog.Log("msg", "making class collector")
+	clog = clog.With("collector", "class")
+	clog.Info("making class collector")
 
 	return &ClassCollector{
-		logger: clog,
+		logger: *clog,
 		netns:  netns,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "bytes_total"),
@@ -113,7 +113,7 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 	// First we go and get the hostname of the system, so it can later be used in the labels
 	host, err := os.Hostname()
 	if err != nil {
-		cc.logger.Log("msg", "failed to get hostname", "err", err)
+		cc.logger.Info("failed to get hostname", "err", err)
 	}
 
 	// start iterating over the defined namespaces and devices
@@ -124,7 +124,7 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 			// Get all TC classes  for the specified device
 			classes, err := getClasses(uint32(interf.Index), ns)
 			if err != nil {
-				cc.logger.Log("msg", "failed to get classes", "interface", interf.Attributes.Name, "err", err)
+				cc.logger.Error("failed to get classes", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			// Range over each class and report the statisctics of the class to the channel for Prometheus
@@ -252,7 +252,7 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 // ServiceCurveCollector is the object that will collect Service Curve data for the interface. It is
 // mainly used to determine the current limits imposed by the service curve
 type ServiceCurveCollector struct {
-	logger log.Logger
+	logger slog.Logger
 	netns  map[string][]rtnetlink.LinkMessage
 	curves map[string]*tc.ServiceCurve
 	Burst  *prometheus.Desc
@@ -261,16 +261,16 @@ type ServiceCurveCollector struct {
 }
 
 // NewServiceCurveCollector create a new ServiceCurveCollector given a network interface
-func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog log.Logger) (prometheus.Collector, error) {
+func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *slog.Logger) (prometheus.Collector, error) {
 	// Set up the logger for the service curve collector
-	sclog = log.With(sclog, "collector", "hfsc")
-	sclog.Log("msg", "making SC collector")
+	sclog = sclog.With("collector", "hfsc")
+	sclog.Info("making SC collector")
 
 	// We need an object to persust the different types of curves in for each HFSC class
 	curves := make(map[string]*tc.ServiceCurve)
 
 	return &ServiceCurveCollector{
-		logger: sclog,
+		logger: *sclog,
 		curves: curves,
 		netns:  netns,
 		Burst: prometheus.NewDesc(
@@ -309,7 +309,7 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	// First we go and get the hostname of the system, so it can later be used in the labels
 	host, err := os.Hostname()
 	if err != nil {
-		c.logger.Log("msg", "failed to get hostname", "err", err)
+		c.logger.Info("failed to get hostname", "err", err)
 	}
 
 	// start iterating over the defined namespaces and devices
@@ -320,7 +320,7 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 			// Get all the classes for the interface
 			classes, err := getClasses(uint32(interf.Index), ns)
 			if err != nil {
-				c.logger.Log("msg", "failed to get classes", "interface", interf.Attributes.Name, "err", err)
+				c.logger.Info("failed to get classes", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			// Iterate over each class
