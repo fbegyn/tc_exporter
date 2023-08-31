@@ -52,10 +52,9 @@
       };
       devShells.default = pkgs.mkShell rec {
         buildInputs = [
-          pkgs.go
+          pkgs.go_1_21
           pkgs.gofumpt
           pkgs.go-tools
-          pkgs.iproute2
           pkgs.git
           pkgs.nix
           pkgs.nfpm

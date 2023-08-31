@@ -6,7 +6,7 @@ build:
 	go build -o bin/tc_exporter -ldflags "-w -s\
 		-X main.Branch=$(shell git rev-parse --abbrev-ref HEAD)\
 		-X main.Revision=$(shell git rev-list -1 HEAD)\
-		-X main.Version=$(shell cat ./VERSION)" \
+		-X main.Version=$(shell git tag --points-at HEAD)" \
 		./cmd/tc_exporter
 
 clean:

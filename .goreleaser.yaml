@@ -15,6 +15,12 @@ builds:
       - amd64
       - arm64
     main: ./cmd/tc_exporter
+    ldflags:
+      - "-w -s"
+      - "-X main.Branch={{ .Branch }}"
+      - "-X main.Revision={{ .Commit }}"
+      - "-X main.Version={{ .Tag }}"
+      - "-X main.Date={{ .Date }}"
 archives:
   - id: arch
     name_template: >-
