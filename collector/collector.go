@@ -2,7 +2,6 @@ package tccollector
 
 import (
 	"log/slog"
-	"sync"
 
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
@@ -55,14 +54,9 @@ func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches and updates the data the collector is exporting
 func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
-	wg := sync.WaitGroup{}
-	wg.Add(len(t.Collectors))
 	t.logger.Info("processing scrape")
 	for _, coll := range t.Collectors {
-		go func(c prometheus.Collector) {
-			c.Collect(ch)
-			wg.Done()
-		}(coll)
+		coll.Collect(ch)
 	}
-	wg.Wait()
+	t.logger.Info("scrape complete")
 }
