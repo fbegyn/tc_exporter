@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
@@ -258,6 +259,7 @@ type ServiceCurveCollector struct {
 	Burst  *prometheus.Desc
 	Delay  *prometheus.Desc
 	Rate   *prometheus.Desc
+	Mutex  *sync.Mutex
 }
 
 // NewServiceCurveCollector create a new ServiceCurveCollector given a network interface
@@ -288,6 +290,7 @@ func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *s
 			"Rate parameter of the service curve",
 			curvelabels, nil,
 		),
+		Mutex: &sync.Mutex{},
 	}, nil
 }
 
@@ -306,12 +309,12 @@ func (c *ServiceCurveCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches and updates the data the collector is exporting
 func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
+	c.Mutex.Lock()
 	// First we go and get the hostname of the system, so it can later be used in the labels
 	host, err := os.Hostname()
 	if err != nil {
 		c.logger.Info("failed to get hostname", "err", err)
 	}
-
 	// start iterating over the defined namespaces and devices
 	for ns, devices := range c.netns {
 		// interate over each device, TODO: maybe there is a more elegant way to do this then 2 for
@@ -384,6 +387,7 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+	c.Mutex.Unlock()
 
 }
 
