@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.21
+          go-version: 1.22
 
       - name: Test collector
         run: go test -v -exec sudo ./collector/
@@ -29,17 +29,17 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.21
+          go-version: 1.22
 
       - name: Fetch all tags
         run: git fetch --force --tags
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
