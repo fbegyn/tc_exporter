@@ -7,7 +7,6 @@ require (
 	github.com/florianl/go-tc v0.4.3
 	github.com/jsimonetti/rtnetlink v1.4.1
 	github.com/mdlayher/netlink v1.7.2
-	github.com/mdlayher/promtest v0.0.0-20190902162024-2b6f8ce579e3
 	github.com/prometheus/client_golang v1.19.0
 	github.com/spf13/viper v1.18.2
 	golang.org/x/sys v0.18.0
@@ -28,7 +27,6 @@ require (
 	github.com/prometheus/client_model v0.6.0 // indirect
 	github.com/prometheus/common v0.51.1 // indirect
 	github.com/prometheus/procfs v0.13.0 // indirect
-	github.com/prometheus/prometheus v2.5.0+incompatible // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
