@@ -21,19 +21,7 @@
     in rec {
       defaultPackage = pkgs.buildGoModule {
         name = "tc_exporter";
-        src = pkgs.stdenv.mkDerivation {
-          name = "gosrc";
-          srcs = [./go.mod ./go.sum ./cmd ./collector ./scripts];
-          phases = "installPhase";
-          installPhase = ''
-            mkdir $out
-            for src in $srcs; do
-              for srcFile in $src; do
-                cp -r $srcFile $out/$(stripHash $srcFile)
-              done
-            done
-          '';
-        };
+        src = ./.;
         CGO_ENABLED = 0;
         doCheck = false;
         checkPhase = ''
@@ -41,24 +29,21 @@
           staticcheck ./collector/
           go test -exec sudo ./collector/ -v
         '';
-        checkInputs = [
-          pkgs.iproute2
-        ];
-        vendorSha256 = "sha256-nNHmEAmrpC/hS3KOyhxsHyWdH7q4YCjQLD7GOegGMd0=";
-        subPackages = [];
+        vendorHash = "sha256-Ua7fadV2l5J6qg6Irh/vF40FD4o6G5ug72ZcD63s7B0";
         ldflags = [
           "-s" "-w"
         ];
       };
       devShells.default = pkgs.mkShell rec {
-        buildInputs = [
-          pkgs.go_1_21
-          pkgs.gofumpt
-          pkgs.go-tools
-          pkgs.git
-          pkgs.nix
-          pkgs.nfpm
-          pkgs.goreleaser
+        buildInputs = with pkgs; [
+          go_1_22
+          gofumpt
+          go-tools
+          git
+          nix
+          nfpm
+          goreleaser
+          gnumake
         ];
       };
     });
