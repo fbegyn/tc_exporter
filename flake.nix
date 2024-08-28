@@ -29,21 +29,24 @@
           staticcheck ./collector/
           go test -exec sudo ./collector/ -v
         '';
-        vendorHash = "sha256-Ua7fadV2l5J6qg6Irh/vF40FD4o6G5ug72ZcD63s7B0";
+        checkInputs = [
+          pkgs.iproute2
+        ];
+        vendorHash = "sha256-nNHmEAmrpC/hS3KOyhxsHyWdH7q4YCjQLD7GOegGMd0=";
+        subPackages = [];
         ldflags = [
           "-s" "-w"
         ];
       };
       devShells.default = pkgs.mkShell rec {
-        buildInputs = with pkgs; [
-          go_1_22
-          gofumpt
-          go-tools
-          git
-          nix
-          nfpm
-          goreleaser
-          gnumake
+        buildInputs = [
+          pkgs.go_1_23
+          pkgs.gofumpt
+          pkgs.go-tools
+          pkgs.git
+          pkgs.nix
+          pkgs.nfpm
+          pkgs.goreleaser
         ];
       };
     });
