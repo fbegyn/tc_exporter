@@ -38,9 +38,6 @@
           staticcheck ./collector/
           go test -exec sudo ./collector/ -v
         '';
-        checkInputs = [
-          pkgs.iproute2
-        ];
         vendorHash = "sha256-ZRnfVXV6/QJ98EsgTswxMeIroGfxJ2D436WzCwcVvbU";
         ldflags = [
           "-s" "-w"
