@@ -6,17 +6,26 @@
       url = "github:edolstra/flake-compat";
       flake = false;
     };
+    devshell = {
+      url = "github:numtide/devshell";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
+    devshell,
     ...
   } @inputs:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
         inherit system;
+        config = import ./go.nix;
+        overlays = [ devshell.overlays.default ];
       };
     in rec {
       defaultPackage = pkgs.buildGoModule {
@@ -32,21 +41,22 @@
         checkInputs = [
           pkgs.iproute2
         ];
-        vendorHash = "sha256-nNHmEAmrpC/hS3KOyhxsHyWdH7q4YCjQLD7GOegGMd0=";
-        subPackages = [];
+        vendorHash = "sha256-ZRnfVXV6/QJ98EsgTswxMeIroGfxJ2D436WzCwcVvbU";
         ldflags = [
           "-s" "-w"
         ];
       };
-      devShells.default = pkgs.mkShell rec {
-        buildInputs = [
-          pkgs.go_1_23
-          pkgs.gofumpt
-          pkgs.go-tools
-          pkgs.git
-          pkgs.nix
-          pkgs.nfpm
-          pkgs.goreleaser
+      devShells.default = pkgs.devshell.mkShell rec {
+        name = "tc-exporer";
+        packages = with pkgs; [
+          go_1_23
+          gofumpt
+          go-tools
+          git
+          nix
+          nfpm
+          goreleaser
+          gnumake
         ];
       };
     });

@@ -4,9 +4,10 @@ tags
 *.deb
 *.rpm
 
-tc_exporter
 dist/
-result
+/result
+/tc_exporter
+/vendor
 
 .direnv
 .vagrant
