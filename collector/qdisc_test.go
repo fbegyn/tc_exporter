@@ -64,7 +64,7 @@ func TestQdiscCollector(t *testing.T) {
 			if err != nil {
 				t.Logf("removing interface %s from %s\n", tt.name, tt.ns)
 				rtnl.Link.Delete(tt.linkid)
-				t.Fatalf("failed to create qdisc collector for %s: %v", interf.Attributes.Name, err)
+				t.Fatalf("failed to delete qdisc collector for %s: %v", interf.Attributes.Name, err)
 			}
 
 			// body := promtest.Collect(t, qc)
