@@ -3,6 +3,7 @@ package tccollector
 import (
 	"log/slog"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -68,7 +69,7 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 				}
 				collectors = append(collectors, coll)
 	                case "fq_codel":
-				coll, err := NewFqCodelCollector()(netns, logger)
+				coll, err := NewFqCodelCollector(netns, logger)
 				if err != nil {
 					return nil, err
 				}
@@ -80,7 +81,7 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 				}
 				collectors = append(collectors, coll)
 	                case "htb":
-				coll, err := NewHTBCollector()(netns, logger)
+				coll, err := NewHTBCollector(netns, logger)
 				if err != nil {
 					return nil, err
 				}
@@ -129,9 +130,37 @@ func (t TcCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches and updates the data the collector is exporting
 func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
-	t.logger.Info("processing scrape")
+	t.logger.Info("processing scrape, fetching data structures")
+
+	qdiscs, classes, filters := make([]tc.Object,0),make([]tc.Object,0),make([]tc.Object,0)
+	for ns, devices := range t.netns {
+		for _, interf := range devices {
+			// fetch all the the qdisc for this interface
+			qds, err := getQdiscs(uint32(interf.Index), ns)
+			if err != nil {
+				t.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+			}
+			qdiscs = append(qdiscs, qds...)
+
+			// fetch all the the qdisc for this interface
+			cls, err := getClasses(uint32(interf.Index), ns)
+			if err != nil {
+				t.logger.Error("failed to get classes", "interface", interf.Attributes.Name, "err", err)
+			}
+			classes = append(classes, cls...)
+
+			// fetch all the the qdisc for this interface
+			fls, err := getFilters(uint32(interf.Index), ns)
+			if err != nil {
+				t.logger.Error("failed to get filters", "interface", interf.Attributes.Name, "err", err)
+			}
+			filters = append(filters, fls...)
+		}
+	}
+
+	t.logger.Info("data fetched, passing it along to the exports")
 	for _, coll := range t.Collectors {
-		coll.Collect(ch)
+		coll.CollectWithData(ch, qdiscs)
 	}
 	t.logger.Info("scrape complete")
 }

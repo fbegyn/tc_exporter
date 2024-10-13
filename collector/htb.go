@@ -11,17 +11,17 @@ import (
 )
 
 var (
-	fqCodelLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
+	htbLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
 // FqCollector is the object that will collect FQ qdisc data for the interface
-type FqCodelCollector struct {
+type HTBCollector struct {
 	logger     slog.Logger
 	netns      map[string][]rtnetlink.LinkMessage
 }
 
 // NewFqCollector create a new QdiscCollector given a network interface
-func NewFqCodelCollector(netns map[string][]rtnetlink.LinkMessage, fqcodellog *slog.Logger) (prometheus.Collector, error) {
+func NewHTBCollector(netns map[string][]rtnetlink.LinkMessage, fqcodellog *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
 	fqcodellog = fqcodellog.With("collector", "fq_codel")
 	fqcodellog.Info("making qdisc collector")
@@ -32,13 +32,13 @@ func NewFqCodelCollector(netns map[string][]rtnetlink.LinkMessage, fqcodellog *s
 		gcFlows: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fq_codel", "gc_flows"),
 			"FQ gc flow counter",
-			fqCodelLabels, nil,
+			htbLabels, nil,
 		),
 	}, nil
 }
 
 // Describe implements Collector
-func (qc *FqCodelCollector) Describe(ch chan<- *prometheus.Desc) {
+func (qc *HTBCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 	}
 
@@ -48,7 +48,7 @@ func (qc *FqCodelCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (qc *FqCodelCollector) Collect(ch chan<- prometheus.Metric) {
+func (qc *HTBCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -72,7 +72,7 @@ func (qc *FqCodelCollector) Collect(ch chan<- prometheus.Metric) {
 				ch <- prometheus.MustNewConstMetric(
 					qc.type,
 					prometheus.CounterValue,
-					float64(qd.XStats.FqCodel.Type),
+					float64(qd.XStats.HTB.Type),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),

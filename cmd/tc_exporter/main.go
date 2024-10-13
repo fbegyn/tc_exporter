@@ -16,11 +16,13 @@ import (
 	kingpin "github.com/alecthomas/kingpin/v2"
 )
 
+// Config datasructure representing the configuration file
 type Config struct {
 	ListenAddres string ``
 	NetNS        map[string]NS
 }
 
+// NS holds a type alias so we can use it in the config file
 type NS struct {
 	Interfaces []string
 }
@@ -77,11 +79,17 @@ func main() {
 	}
 
 	enabledCollectors := map[string]bool{
-		"hfsc": true,
-		"fq": true,
-		"fqcodel": true,
-		"hfscq": true,
-		"htb": true,
+		"cbq": true,
+	        "choke": true,
+	        "codel": true,
+	        "fq": true,
+	        "fq_codel": true,
+	        "hfsc": true,
+	        "htb": true,
+	        "pie": true,
+	        "red": true,
+	        "sfb": true,
+	        "sfq": true,
 	}
 
 	// initialise the collector with the configured subcollectors

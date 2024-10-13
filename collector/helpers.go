@@ -91,24 +91,22 @@ func getClasses(devid uint32, ns string) ([]tc.Object, error) {
 	}
 	defer sock.Close()
 
-	interf, err := net.InterfaceByName(ns)
-
-	qdiscs, err := sock.Class().Get(&tc.Msg{
+	classes, err := sock.Class().Get(&tc.Msg{
 		Family: unix.AF_UNSPEC,
 		Info: 0,
 		Handle: tc.HandleRoot,
-		Ifindex: net.,
+		Ifindex: devid,
 	})
 	if err != nil {
 		return nil, err
 	}
-	var qd []tc.Object
-	for _, qdisc := range qdiscs {
-		if qdisc.Ifindex == devid {
-			qd = append(qd, qdisc)
+	var cl []tc.Object
+	for _, class := range classes {
+		if class.Ifindex == devid {
+			cl = append(cl, class)
 		}
 	}
-	return qd, nil
+	return cl, nil
 }
 
 // getQdiscs fetches all qdiscs for a pecified interface in the netns
@@ -118,15 +116,22 @@ func getFilters(devid uint32, ns string) ([]tc.Object, error) {
 		return nil, err
 	}
 	defer sock.Close()
-	qdiscs, err := sock.Filter().Get()
+
+	filters, err := sock.Filter().Get(&tc.Msg{
+		Family: unix.AF_UNSPEC,
+		Info: 0,
+		Handle: tc.HandleRoot,
+		Ifindex: devid,
+	})
 	if err != nil {
 		return nil, err
 	}
-	var qd []tc.Object
-	for _, qdisc := range qdiscs {
-		if qdisc.Ifindex == devid {
-			qd = append(qd, qdisc)
+	var fl []tc.Object
+	for _, filter := range filters {
+		if filter.Ifindex == devid {
+			fl = append(fl, filter)
 		}
 	}
-	return qd, nil
+
+	return fl, nil
 }
