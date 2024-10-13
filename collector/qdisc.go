@@ -221,22 +221,3 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// getQdiscs fetches all qdiscs for a pecified interface in the netns
-func getQdiscs(devid uint32, ns string) ([]tc.Object, error) {
-	sock, err := GetTcConn(ns)
-	if err != nil {
-		return nil, err
-	}
-	defer sock.Close()
-	qdiscs, err := sock.Qdisc().Get()
-	if err != nil {
-		return nil, err
-	}
-	var qd []tc.Object
-	for _, qdisc := range qdiscs {
-		if qdisc.Ifindex == devid {
-			qd = append(qd, qdisc)
-		}
-	}
-	return qd, nil
-}

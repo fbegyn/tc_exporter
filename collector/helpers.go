@@ -1,9 +1,11 @@
 package tccollector
 
 import (
+	"net"
 	"os"
 
 	"github.com/florianl/go-tc"
+	"github.com/florianl/go-tc/internal/unix"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/netlink"
 )
@@ -59,4 +61,72 @@ func GetTcConn(ns string) (sock *tc.Tc, err error) {
 		}
 	}
 	return
+}
+
+// getQdiscs fetches all qdiscs for a pecified interface in the netns
+func getQdiscs(devid uint32, ns string) ([]tc.Object, error) {
+	sock, err := GetTcConn(ns)
+	if err != nil {
+		return nil, err
+	}
+	defer sock.Close()
+	qdiscs, err := sock.Qdisc().Get()
+	if err != nil {
+		return nil, err
+	}
+	var qd []tc.Object
+	for _, qdisc := range qdiscs {
+		if qdisc.Ifindex == devid {
+			qd = append(qd, qdisc)
+		}
+	}
+	return qd, nil
+}
+
+// getQdiscs fetches all qdiscs for a pecified interface in the netns
+func getClasses(devid uint32, ns string) ([]tc.Object, error) {
+	sock, err := GetTcConn(ns)
+	if err != nil {
+		return nil, err
+	}
+	defer sock.Close()
+
+	interf, err := net.InterfaceByName(ns)
+
+	qdiscs, err := sock.Class().Get(&tc.Msg{
+		Family: unix.AF_UNSPEC,
+		Info: 0,
+		Handle: tc.HandleRoot,
+		Ifindex: net.,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var qd []tc.Object
+	for _, qdisc := range qdiscs {
+		if qdisc.Ifindex == devid {
+			qd = append(qd, qdisc)
+		}
+	}
+	return qd, nil
+}
+
+// getQdiscs fetches all qdiscs for a pecified interface in the netns
+func getFilters(devid uint32, ns string) ([]tc.Object, error) {
+	sock, err := GetTcConn(ns)
+	if err != nil {
+		return nil, err
+	}
+	defer sock.Close()
+	qdiscs, err := sock.Filter().Get()
+	if err != nil {
+		return nil, err
+	}
+	var qd []tc.Object
+	for _, qdisc := range qdiscs {
+		if qdisc.Ifindex == devid {
+			qd = append(qd, qdisc)
+		}
+	}
+	return qd, nil
 }

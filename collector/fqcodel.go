@@ -11,49 +11,26 @@ import (
 )
 
 var (
-	fqLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
+	fqCodelLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
 // FqCollector is the object that will collect FQ qdisc data for the interface
 type FqCodelCollector struct {
 	logger     slog.Logger
 	netns      map[string][]rtnetlink.LinkMessage
-
-        gcFlows              *prometheus.Desc  // uint64
-	highPrioPackets      *prometheus.Desc  // uint64
-	tcpRetrans           *prometheus.Desc  // uint64
-	throttled            *prometheus.Desc  // uint64
-	flowsPlimit          *prometheus.Desc  // uint64
-	pktsTooLong          *prometheus.Desc  // uint64
-	allocationErrors     *prometheus.Desc  // uint64
-	timeNextDelayedFlow  *prometheus.Desc  // int64
-	flows                *prometheus.Desc  // uint32
-	inactiveFlows        *prometheus.Desc  // uint32
-	throttledFlows       *prometheus.Desc  // uint32
-	unthrottleLatencyNs  *prometheus.Desc  // uint32
-	ceMark               *prometheus.Desc  // uint64
-	horizonDrops         *prometheus.Desc  // uint64
-	horizonCaps          *prometheus.Desc  // uint64
-	fastpathPackets      *prometheus.Desc  // uint64
-	bandDrops0           *prometheus.Desc  // [3]uint64 // FQ_BANDS = 3
-	bandDrops1           *prometheus.Desc  // [3]uint64 // FQ_BANDS = 3
-	bandDrops2           *prometheus.Desc  // [3]uint64 // FQ_BANDS = 3
-	bandPktCount0        *prometheus.Desc  // [3]uint32 // FQ_BANDS = 3
-	bandPktCount1        *prometheus.Desc  // [3]uint32 // FQ_BANDS = 3
-	bandPktCount2        *prometheus.Desc  // [3]uint32 // FQ_BANDS = 3
 }
 
 // NewFqCollector create a new QdiscCollector given a network interface
-func NewFqCollector(netns map[string][]rtnetlink.LinkMessage, fqlog *slog.Logger) (prometheus.Collector, error) {
+func NewFqCodelCollector(netns map[string][]rtnetlink.LinkMessage, fqcodellog *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
-	fqlog = fqlog.With("collector", "fq")
-	fqlog.Info("making qdisc collector")
+	fqcodellog = fqcodellog.With("collector", "fq_codel")
+	fqcodellog.Info("making qdisc collector")
 
 	return &FqCollector{
-		logger: *fqlog,
+		logger: *fqcodellog,
 		netns:  netns,
 		gcFlows: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "fq", "gc_flows"),
+			prometheus.BuildFQName(namespace, "fq_codel", "gc_flows"),
 			"FQ gc flow counter",
 			fqLabels, nil,
 		),
@@ -61,7 +38,7 @@ func NewFqCollector(netns map[string][]rtnetlink.LinkMessage, fqlog *slog.Logger
 }
 
 // Describe implements Collector
-func (qc *FqCollector) Describe(ch chan<- *prometheus.Desc) {
+func (qc *FqCodelCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
 	}
 
@@ -71,7 +48,7 @@ func (qc *FqCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (qc *FqCollector) Collect(ch chan<- prometheus.Metric) {
+func (qc *FqCodelCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -104,253 +81,13 @@ func (qc *FqCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.qdDropOverLimit,
-					prometheus.CounterValue,
-					float64(qd.XStats.FqCodel.Qd.DropOverlimit),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.qdDrop,
-					prometheus.GaugeValue,
-					float64(qd.XStats.FqCodel.Qd.MaxPacket),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.qdDropOvermemory,
-					prometheus.GaugeValue,
-					float64(qd.XStats.FqCodel.Qd.DropOvermemory),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.flowsPlimit,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.FlowsPlimit),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.pktsTooLong,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.PktsTooLong),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.allocationErrors,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.AllocationErrors),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.timeNextDelayedFlow,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.TimeNextDelayedFlow),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.flows,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.Flows),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.inactiveFlows,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.InactiveFlows),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.throttledFlows,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.ThrottledFlows),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.ceMark,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.CEMark),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.horizonDrops,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.HorizonDrops),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.horizonCaps,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.HorizonCaps),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.fastpathPackets,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.FastpathPackets),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.bandDrops0,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.BandDrops[0]),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.bandDrops1,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.BandDrops[1]),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.bandDrops2,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.BandDrops[2]),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.bandPktCount0,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.BandPktCount[0]),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.bandPktCount1,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.BandPktCount[1]),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.bandPktCount2,
-					prometheus.CounterValue,
-					float64(qd.XStats.Fq.BandPktCount[2]),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
 			}
 		}
 	}
 }
 
 // getQdiscs fetches all qdiscs for a pecified interface in the netns
-func getFQQdiscs(devid uint32, ns string) ([]tc.Object, error) {
+func getFQCodelQdiscs(devid uint32, ns string) ([]tc.Object, error) {
 	sock, err := GetTcConn(ns)
 	if err != nil {
 		return nil, err

@@ -65,16 +65,27 @@ func main() {
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
 
+	// fetch all the interfaces from the configured network namespaces
+	// and store them in a map
 	netns := make(map[string][]rtnetlink.LinkMessage)
 	for ns, sp := range cf.NetNS {
-		interfaces, err := getInterfaceInNS(sp.Interfaces, ns)
+		interfaces, err := getInterfacesInNetNS(sp.Interfaces, ns)
 		if err != nil {
 			logger.Error("failed to get interfaces from ns", "err", err, "netns", ns)
 		}
 		netns[ns] = interfaces
 	}
 
-	collector, err := tcexporter.NewTcCollector(netns, logger)
+	enabledCollectors := map[string]bool{
+		"hfsc": true,
+		"fq": true,
+		"fqcodel": true,
+		"hfscq": true,
+		"htb": true,
+	}
+
+	// initialise the collector with the configured subcollectors
+	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, logger)
 	if err != nil {
 		logger.Error("msg", "failed to create TC collector", "err", err)
 	}
@@ -92,7 +103,7 @@ func main() {
 	}
 }
 
-func getInterfaceInNS(devices []string, ns string) ([]rtnetlink.LinkMessage, error) {
+func getInterfacesInNetNS(devices []string, ns string) ([]rtnetlink.LinkMessage, error) {
 	con, err := tcexporter.GetNetlinkConn(ns)
 	if err != nil {
 		return nil, err
