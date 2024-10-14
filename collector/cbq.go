@@ -109,7 +109,7 @@ func (col *CBQCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%d", interf.Index),
 					interf.Attributes.Name,
 					qd.Kind,
-	§				fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
