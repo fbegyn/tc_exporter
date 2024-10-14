@@ -5,60 +5,64 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	cbqLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
+	redLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
-// CBQCollector is the object that will collect CBQ qdisc data for the interface
-type CBQCollector struct {
-	logger     slog.Logger
-	netns      map[string][]rtnetlink.LinkMessage
-	AvgIdle  *prometheus.Desc
-	Borrows  *prometheus.Desc
-	Overactions  *prometheus.Desc
-	Undertime  *prometheus.Desc
+// RedCollector is the object that will collect RED qdisc data for the interface
+type RedCollector struct {
+	logger slog.Logger
+	netns  map[string][]rtnetlink.LinkMessage
+
+	early  *prometheus.Desc
+	marked *prometheus.Desc
+	other  *prometheus.Desc
+	pDrop  *prometheus.Desc
 }
 
-// NewCBQCollector create a new QdiscCollector given a network interface
-func NewCBQCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+// NewRedCollector create a new QdiscCollector given a network interface
+func NewRedCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
-	log = log.With("collector", "cbq")
-	log.Debug("making cbq collector")
+	log = log.With("collector", "red")
+	log.Info("making red collector")
 
-	return &CBQCollector{
+	return &RedCollector{
 		logger: *log,
 		netns:  netns,
-		AvgIdle: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "cbq", "avg_idle"),
-			"CBQ avg idle xstat",
-			cbqLabels, nil,
+		early: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "red", "early"),
+			"RED early xstat",
+			redLabels, nil,
 		),
-		Borrows: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "cbq", "borrows"),
-			"CBQ borrows xstat",
-			cbqLabels, nil,
+		marked: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "red", "marked"),
+			"RED marked xstat",
+			redLabels, nil,
 		),
-		Overactions: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "cbq", "overactions"),
-			"CBQ overactions xstat",
-			cbqLabels, nil,
+		other: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "red", "other"),
+			"RED other xstat",
+			redLabels, nil,
 		),
-		Undertime: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "cbq", "under_time"),
-			"CBQ under time xstat",
-			cbqLabels, nil,
+		pDrop: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "red", "pdrop"),
+			"RED pdrop xstat",
+			redLabels, nil,
 		),
 	}, nil
 }
 
 // Describe implements Collector
-func (col *CBQCollector) Describe(ch chan<- *prometheus.Desc) {
+func (col *RedCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
+		col.early,
+		col.marked,
+		col.other,
+		col.pDrop,
 	}
 
 	for _, d := range ds {
@@ -67,7 +71,7 @@ func (col *CBQCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (col *CBQCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *RedCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -78,20 +82,23 @@ func (col *CBQCollector) Collect(ch chan<- prometheus.Metric) {
 	for ns, devices := range col.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
-			qdiscs, err := getFQQdiscs(uint32(interf.Index), ns)
+			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
 			if err != nil {
 				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
 			for _, qd := range qdiscs {
+				if qd.Red == nil {
+					continue
+				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
 				parentMaj, parentMin := HandleStr(qd.Parent)
 
 				ch <- prometheus.MustNewConstMetric(
-					col.AvgIdle,
+					col.early,
 					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.AvgIdle),
+					float64(qd.XStats.Red.Early),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -101,21 +108,9 @@ func (col *CBQCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					col.Borrows,
+					col.marked,
 					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.Borrows),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-	§				fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					col.Overactions,
-					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.Overactions),
+					float64(qd.XStats.Red.Marked),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -125,9 +120,21 @@ func (col *CBQCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					col.Undertime,
+					col.other,
 					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.Undertime),
+					float64(qd.XStats.Red.Other),
+					host,
+					ns,
+					fmt.Sprintf("%d", interf.Index),
+					interf.Attributes.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					col.pDrop,
+					prometheus.CounterValue,
+					float64(qd.XStats.Red.PDrop),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),

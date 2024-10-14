@@ -10,86 +10,87 @@ import (
 )
 
 var (
-	qdisclabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
+	pieLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
-// QdiscCollector is the object that will collect Qdisc data for the interface
-type QdiscCollector struct {
-	logger     slog.Logger
-	netns      map[string][]rtnetlink.LinkMessage
-	bytes      *prometheus.Desc
-	packets    *prometheus.Desc
-	bps        *prometheus.Desc
-	pps        *prometheus.Desc
-	backlog    *prometheus.Desc
-	drops      *prometheus.Desc
-	overlimits *prometheus.Desc
-	qlen       *prometheus.Desc
+// PieCollector is the object that will collect pie qdisc data for the interface
+type PieCollector struct {
+	logger slog.Logger
+	netns  map[string][]rtnetlink.LinkMessage
+
+	avgDqRate *prometheus.Desc
+	delay     *prometheus.Desc
+	dropped   *prometheus.Desc
+	ecnMark   *prometheus.Desc
+	maxq      *prometheus.Desc
+	overlimit *prometheus.Desc
+	packetsIn *prometheus.Desc
+	prob      *prometheus.Desc
 }
 
-// NewQdiscCollector create a new QdiscCollector given a network interface
-func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog *slog.Logger) (prometheus.Collector, error) {
+// NewPieCollector create a new QdiscCollector given a network interface
+func NewPieCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
-	qlog = qlog.With("collector", "qdisc")
-	qlog.Info("making qdisc collector")
+	log = log.With("collector", "pie")
+	log.Info("making pie collector")
 
-	return &QdiscCollector{
-		logger: *qlog,
+	return &PieCollector{
+		logger: *log,
 		netns:  netns,
-		bytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "bytes_total"),
-			"Qdisc byte counter",
-			qdisclabels, nil,
+		avgDqRate: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "avg_dq_rate"),
+			"PIE avgdqrate xstat",
+			pieLabels, nil,
 		),
-		packets: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "packets_total"),
-			"Qdisc packet counter",
-			qdisclabels, nil,
+		delay: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "delay"),
+			"PIE delay xstat",
+			pieLabels, nil,
 		),
-		bps: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "bps"),
-			"Qdisc byte rate",
-			qdisclabels, nil,
+		dropped: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "dropped"),
+			"PIE dropped",
+			pieLabels, nil,
 		),
-		pps: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "pps"),
-			"Qdisc packet rate",
-			qdisclabels, nil,
+		ecnMark: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "ecn_mark"),
+			"PIE ecn mark xstat",
+			pieLabels, nil,
 		),
-		backlog: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "backlog_total"),
-			"Qdisc queue backlog",
-			qdisclabels, nil,
+		maxq: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "maxq"),
+			"PIE maxq xstat",
+			pieLabels, nil,
 		),
-		drops: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "drops_total"),
-			"Qdisc queue drops",
-			qdisclabels, nil,
+		overlimit: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "overlimit"),
+			"PIE overlimit xstat",
+			pieLabels, nil,
 		),
-		overlimits: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "overlimits_total"),
-			"Qdisc queue overlimits",
-			qdisclabels, nil,
+		packetsIn: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "packets_in"),
+			"PIE packets in xstat",
+			pieLabels, nil,
 		),
-		qlen: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "qdisc", "qlen_total"),
-			"Qdisc queue length",
-			qdisclabels, nil,
+		prob: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "pie", "prob"),
+			"PIE prob xstat",
+			pieLabels, nil,
 		),
 	}, nil
 }
 
 // Describe implements Collector
-func (qc *QdiscCollector) Describe(ch chan<- *prometheus.Desc) {
+func (col *PieCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
-		qc.backlog,
-		qc.bps,
-		qc.bytes,
-		qc.packets,
-		qc.drops,
-		qc.overlimits,
-		qc.pps,
-		qc.qlen,
+		col.avgDqRate,
+		col.delay,
+		col.dropped,
+		col.ecnMark,
+		col.maxq,
+		col.overlimit,
+		col.packetsIn,
+		col.prob,
 	}
 
 	for _, d := range ds {
@@ -98,31 +99,34 @@ func (qc *QdiscCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *PieCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
-		qc.logger.Error("failed to fetch hostname", "err", err)
+		col.logger.Error("failed to fetch hostname", "err", err)
 	}
 
 	// iterate through the netns and devices
-	for ns, devices := range qc.netns {
+	for ns, devices := range col.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
 			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
 			if err != nil {
-				qc.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
 			for _, qd := range qdiscs {
+				if qd.Pie == nil {
+					continue
+				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
 				parentMaj, parentMin := HandleStr(qd.Parent)
 
 				ch <- prometheus.MustNewConstMetric(
-					qc.bytes,
+					col.avgDqRate,
 					prometheus.CounterValue,
-					float64(qd.Stats.Bytes),
+					float64(qd.XStats.Pie.AvgDqRate),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -132,9 +136,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					qc.packets,
+					col.delay,
 					prometheus.CounterValue,
-					float64(qd.Stats.Packets),
+					float64(qd.XStats.Pie.Delay),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -144,33 +148,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					qc.bps,
-					prometheus.GaugeValue,
-					float64(qd.Stats.Bps),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.pps,
-					prometheus.GaugeValue,
-					float64(qd.Stats.Pps),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					qc.backlog,
+					col.dropped,
 					prometheus.CounterValue,
-					float64(qd.Stats.Backlog),
+					float64(qd.XStats.Pie.Dropped),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -180,9 +160,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					qc.drops,
+					col.ecnMark,
 					prometheus.CounterValue,
-					float64(qd.Stats.Drops),
+					float64(qd.XStats.Pie.EcnMark),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -192,9 +172,9 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					qc.overlimits,
+					col.maxq,
 					prometheus.CounterValue,
-					float64(qd.Stats.Overlimits),
+					float64(qd.XStats.Pie.Maxq),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -204,9 +184,33 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
-					qc.qlen,
+					col.overlimit,
 					prometheus.CounterValue,
-					float64(qd.Stats.Qlen),
+					float64(qd.XStats.Pie.Overlimit),
+					host,
+					ns,
+					fmt.Sprintf("%d", interf.Index),
+					interf.Attributes.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					col.packetsIn,
+					prometheus.CounterValue,
+					float64(qd.XStats.Pie.PacketsIn),
+					host,
+					ns,
+					fmt.Sprintf("%d", interf.Index),
+					interf.Attributes.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					col.prob,
+					prometheus.CounterValue,
+					float64(qd.XStats.Pie.Prob),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),

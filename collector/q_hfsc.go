@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
@@ -14,32 +15,55 @@ var (
 	hfscLabels []string = []string{"host", "netns", "linkindex", "link", "type", "handle", "parent"}
 )
 
-// FqCollector is the object that will collect FQ qdisc data for the interface
+// HfscCollector is the object that will collect hfsc qdisc data for the interface
 type HfscCollector struct {
-	logger     slog.Logger
-	netns      map[string][]rtnetlink.LinkMessage
+	logger slog.Logger
+	netns  map[string][]rtnetlink.LinkMessage
+	level  *prometheus.Desc
+	period *prometheus.Desc
+	rtWork *prometheus.Desc
+	work   *prometheus.Desc
 }
 
-// NewFqCollector create a new QdiscCollector given a network interface
-func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, fqcodellog *slog.Logger) (prometheus.Collector, error) {
+// NewHfscCollector create a new QdiscCollector given a network interface
+func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
 	// Setup logger for qdisc collector
-	fqcodellog = fqcodellog.With("collector", "fq_codel")
-	fqcodellog.Info("making qdisc collector")
+	log = log.With("collector", "hfsc")
+	log.Info("making hfsc collector")
 
-	return &FqCollector{
-		logger: *fqcodellog,
+	return &HfscCollector{
+		logger: *log,
 		netns:  netns,
-		gcFlows: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "fq_codel", "gc_flows"),
-			"FQ gc flow counter",
+		level: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "hfsc", "level"),
+			"hfsc level xstat",
+			hfscLabels, nil,
+		),
+		period: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "hfsc", "period"),
+			"hfsc period xstat",
+			hfscLabels, nil,
+		),
+		rtWork: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "hfsc", "rt_work"),
+			"hfsc rtwork xstat",
+			hfscLabels, nil,
+		),
+		work: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "hfsc", "work"),
+			"hfsc work xstat",
 			hfscLabels, nil,
 		),
 	}, nil
 }
 
 // Describe implements Collector
-func (qc *HfscCollector) Describe(ch chan<- *prometheus.Desc) {
+func (col *HfscCollector) Describe(ch chan<- *prometheus.Desc) {
 	ds := []*prometheus.Desc{
+		col.level,
+		col.period,
+		col.rtWork,
+		col.work,
 	}
 
 	for _, d := range ds {
@@ -48,31 +72,70 @@ func (qc *HfscCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (qc *HfscCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *HfscCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
-		qc.logger.Error("failed to fetch hostname", "err", err)
+		col.logger.Error("failed to fetch hostname", "err", err)
 	}
 
 	// iterate through the netns and devices
-	for ns, devices := range qc.netns {
+	for ns, devices := range col.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
-			qdiscs, err := getFQQdiscs(uint32(interf.Index), ns)
+			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
 			if err != nil {
-				qc.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
 			for _, qd := range qdiscs {
+				if qd.Hfsc == nil {
+					continue
+				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
 				parentMaj, parentMin := HandleStr(qd.Parent)
 
 				ch <- prometheus.MustNewConstMetric(
-					qc.type,
+					col.level,
 					prometheus.CounterValue,
-					float64(qd.XStats.Hfsc.Type),
+					float64(qd.XStats.Hfsc.Level),
+					host,
+					ns,
+					fmt.Sprintf("%d", interf.Index),
+					interf.Attributes.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					col.period,
+					prometheus.CounterValue,
+					float64(qd.XStats.Hfsc.Period),
+					host,
+					ns,
+					fmt.Sprintf("%d", interf.Index),
+					interf.Attributes.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					col.rtWork,
+					prometheus.CounterValue,
+					float64(qd.XStats.Hfsc.RtWork),
+					host,
+					ns,
+					fmt.Sprintf("%d", interf.Index),
+					interf.Attributes.Name,
+					qd.Kind,
+					fmt.Sprintf("%x:%x", handleMaj, handleMin),
+					fmt.Sprintf("%x:%x", parentMaj, parentMin),
+				)
+				ch <- prometheus.MustNewConstMetric(
+					col.work,
+					prometheus.CounterValue,
+					float64(qd.XStats.Hfsc.Work),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
@@ -101,8 +164,8 @@ type ServiceCurveCollector struct {
 // NewServiceCurveCollector create a new ServiceCurveCollector given a network interface
 func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *slog.Logger) (prometheus.Collector, error) {
 	// Set up the logger for the service curve collector
-	sclog = sclog.With("collector", "hfsc")
-	sclog.Info("making SC collector")
+	sclog = sclog.With("collector", "service_curve")
+	sclog.Info("making hfsc service curve collector")
 
 	// We need an object to persust the different types of curves in for each HFSC class
 	curves := make(map[string]*tc.ServiceCurve)
@@ -163,7 +226,7 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			// Iterate over each class
-			for _, cl := range classes {s
+			for _, cl := range classes {
 				handleMaj, handleMin := HandleStr(cl.Handle)
 				parentMaj, parentMin := HandleStr(cl.Parent)
 

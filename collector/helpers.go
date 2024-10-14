@@ -1,13 +1,12 @@
 package tccollector
 
 import (
-	"net"
 	"os"
 
 	"github.com/florianl/go-tc"
-	"github.com/florianl/go-tc/internal/unix"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/netlink"
+	"golang.org/x/sys/unix"
 )
 
 // HandleStr is a simple helper function that cinstruct human readable handles
@@ -92,9 +91,9 @@ func getClasses(devid uint32, ns string) ([]tc.Object, error) {
 	defer sock.Close()
 
 	classes, err := sock.Class().Get(&tc.Msg{
-		Family: unix.AF_UNSPEC,
-		Info: 0,
-		Handle: tc.HandleRoot,
+		Family:  unix.AF_UNSPEC,
+		Info:    0,
+		Handle:  tc.HandleRoot,
 		Ifindex: devid,
 	})
 	if err != nil {
@@ -118,9 +117,9 @@ func getFilters(devid uint32, ns string) ([]tc.Object, error) {
 	defer sock.Close()
 
 	filters, err := sock.Filter().Get(&tc.Msg{
-		Family: unix.AF_UNSPEC,
-		Info: 0,
-		Handle: tc.HandleRoot,
+		Family:  unix.AF_UNSPEC,
+		Info:    0,
+		Handle:  tc.HandleRoot,
 		Ifindex: devid,
 	})
 	if err != nil {

@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"sync"
 
-	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sys/unix"
 )
 
 var (
@@ -249,4 +246,3 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 }
-
