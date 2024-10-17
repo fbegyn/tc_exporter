@@ -26,10 +26,10 @@ type HfscCollector struct {
 }
 
 // NewHfscCollector create a new QdiscCollector given a network interface
-func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (TcSubCollector, error) {
 	// Setup logger for qdisc collector
 	log = log.With("collector", "hfsc")
-	log.Info("making hfsc collector")
+	log.Debug("making hfsc collector")
 
 	return &HfscCollector{
 		logger: *log,
@@ -72,7 +72,7 @@ func (col *HfscCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (col *HfscCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *HfscCollector) Collect(ch chan<- prometheus.Metric, objects map[string]map[string][]tc.Object) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -83,14 +83,14 @@ func (col *HfscCollector) Collect(ch chan<- prometheus.Metric) {
 	for ns, devices := range col.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
-			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
-			if err != nil {
-				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
-			}
+			// qdiscs, err := getQdiscs(uint32(interf.Index), ns)
+			// if err != nil {
+			// 	col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+			// }
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
-			for _, qd := range qdiscs {
-				if qd.Hfsc == nil {
+			for _, qd := range objects[ns]["qdisc"] {
+				if qd.Hfsc == nil || qd.Msg.Ifindex != interf.Index {
 					continue
 				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
@@ -162,10 +162,10 @@ type ServiceCurveCollector struct {
 }
 
 // NewServiceCurveCollector create a new ServiceCurveCollector given a network interface
-func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *slog.Logger) (prometheus.Collector, error) {
+func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *slog.Logger) (TcSubCollector, error) {
 	// Set up the logger for the service curve collector
 	sclog = sclog.With("collector", "service_curve")
-	sclog.Info("making hfsc service curve collector")
+	sclog.Debug("making hfsc service curve collector")
 
 	// We need an object to persust the different types of curves in for each HFSC class
 	curves := make(map[string]*tc.ServiceCurve)
@@ -207,7 +207,7 @@ func (c *ServiceCurveCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
+func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric, objects map[string]map[string][]tc.Object) {
 	c.Mutex.Lock()
 	// First we go and get the hostname of the system, so it can later be used in the labels
 	host, err := os.Hostname()
@@ -220,19 +220,19 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 		// loops, I need a Go wizard to have a look at this.
 		for _, interf := range devices {
 			// Get all the classes for the interface
-			classes, err := getClasses(uint32(interf.Index), ns)
-			if err != nil {
-				c.logger.Info("failed to get classes", "interface", interf.Attributes.Name, "err", err)
-			}
+			// classes, err := getClasses(uint32(interf.Index), ns)
+			// if err != nil {
+			// 	c.logger.Info("failed to get classes", "interface", interf.Attributes.Name, "err", err)
+			// }
 
 			// Iterate over each class
-			for _, cl := range classes {
+			for _, cl := range objects[ns]["class"] {
 				handleMaj, handleMin := HandleStr(cl.Handle)
 				parentMaj, parentMin := HandleStr(cl.Parent)
 
 				// If the class is a HFSC class, fetch the curve information. Otherwise continue to the next
 				// class since we are only intrested in HFSC here
-				if cl.Hfsc == nil {
+				if cl.Hfsc == nil || cl.Msg.Ifindex != interf.Index {
 					continue
 				}
 				c.curves["fsc"] = cl.Hfsc.Fsc

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -28,10 +29,10 @@ type QdiscCollector struct {
 }
 
 // NewQdiscCollector create a new QdiscCollector given a network interface
-func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog *slog.Logger) (prometheus.Collector, error) {
+func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog *slog.Logger) (TcSubCollector, error) {
 	// Setup logger for qdisc collector
 	qlog = qlog.With("collector", "qdisc")
-	qlog.Info("making qdisc collector")
+	qlog.Debug("making qdisc collector")
 
 	return &QdiscCollector{
 		logger: *qlog,
@@ -98,7 +99,7 @@ func (qc *QdiscCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
+func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric, objects map[string]map[string][]tc.Object) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -109,16 +110,18 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 	for ns, devices := range qc.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
-			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
-			if err != nil {
-				qc.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
-			}
+			// qdiscs, err := getQdiscs(uint32(interf.Index), ns)
+			// if err != nil {
+			// 	qc.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+			// }
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
-			for _, qd := range qdiscs {
+			for _, qd := range objects[ns]["qdisc"] {
+				if qd.Msg.Ifindex != interf.Index {
+					continue
+				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
 				parentMaj, parentMin := HandleStr(qd.Parent)
-
 				ch <- prometheus.MustNewConstMetric(
 					qc.bytes,
 					prometheus.CounterValue,

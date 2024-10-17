@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -31,10 +32,10 @@ type ClassCollector struct {
 }
 
 // NewClassCollector create a new ClassCollector given a network interface
-func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog *slog.Logger) (prometheus.Collector, error) {
+func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog *slog.Logger) (TcSubCollector, error) {
 	// Setup logger for the class collector
 	clog = clog.With("collector", "class")
-	clog.Info("making class collector")
+	clog.Debug("making class collector")
 
 	return &ClassCollector{
 		logger: *clog,
@@ -107,7 +108,7 @@ func (cc *ClassCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
+func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric, objects map[string]map[string][]tc.Object) {
 	// First we go and get the hostname of the system, so it can later be used in the labels
 	host, err := os.Hostname()
 	if err != nil {
@@ -120,15 +121,18 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 		// loops, I need a Go wizard to have a look at this.
 		for _, interf := range devices {
 			// Get all TC classes  for the specified device
-			classes, err := getClasses(uint32(interf.Index), ns)
-			if err != nil {
-				cc.logger.Error("failed to get classes", "interface", interf.Attributes.Name, "err", err)
-			}
+			// classes, err := getClasses(uint32(interf.Index), ns)
+			// if err != nil {
+			// 	cc.logger.Error("failed to get classes", "interface", interf.Attributes.Name, "err", err)
+			// }
 
 			// Range over each class and report the statisctics of the class to the channel for Prometheus
 			// metrics. Note that we print the handle with %x, so the hexadecimal notation. This way the
 			// reported labels match the output from `tc -s show class ...`
-			for _, cl := range classes {
+			for _, cl := range objects[ns]["class"] {
+				if cl.Msg.Ifindex != interf.Index {
+					continue
+				}
 				handleMaj, handleMin := HandleStr(cl.Handle)
 				parentMaj, parentMin := HandleStr(cl.Parent)
 

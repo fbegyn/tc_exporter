@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -25,10 +26,10 @@ type HtbCollector struct {
 }
 
 // NewHtbCollector create a new QdiscCollector given a network interface
-func NewHtbCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+func NewHtbCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (TcSubCollector, error) {
 	// Setup logger for qdisc collector
 	log = log.With("collector", "htb")
-	log.Info("making htb collector")
+	log.Debug("making htb collector")
 
 	return &HtbCollector{
 		logger: *log,
@@ -77,7 +78,7 @@ func (col *HtbCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (col *HtbCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *HtbCollector) Collect(ch chan<- prometheus.Metric, objects map[string]map[string][]tc.Object) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -88,14 +89,14 @@ func (col *HtbCollector) Collect(ch chan<- prometheus.Metric) {
 	for ns, devices := range col.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
-			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
-			if err != nil {
-				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
-			}
+			// qdiscs, err := getQdiscs(uint32(interf.Index), ns)
+			// if err != nil {
+			// 	col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+			// }
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
-			for _, qd := range qdiscs {
-				if qd.Htb == nil {
+			for _, qd := range objects[ns]["qdisc"] {
+				if qd.Htb == nil || qd.Msg.Ifindex != interf.Index {
 					continue
 				}
 				handleMaj, handleMin := HandleStr(qd.Handle)

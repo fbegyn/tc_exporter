@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -29,10 +30,10 @@ type CodelCollector struct {
 }
 
 // NewCodelCollector create a new QdiscCollector given a network interface
-func NewCodelCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+func NewCodelCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (TcSubCollector, error) {
 	// Setup logger for qdisc collector
 	log = log.With("collector", "codel")
-	log.Info("making codel collector")
+	log.Debug("making codel collector")
 
 	return &CodelCollector{
 		logger: *log,
@@ -105,7 +106,7 @@ func (col *CodelCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
-func (col *CodelCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *CodelCollector) Collect(ch chan<- prometheus.Metric, objects map[string]map[string][]tc.Object) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
 	if err != nil {
@@ -116,14 +117,14 @@ func (col *CodelCollector) Collect(ch chan<- prometheus.Metric) {
 	for ns, devices := range col.netns {
 		for _, interf := range devices {
 			// fetch all the the qdisc for this interface
-			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
-			if err != nil {
-				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
-			}
+			// qdiscs, err := getQdiscs(uint32(interf.Index), ns)
+			// if err != nil {
+			// 	col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
+			// }
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
-			for _, qd := range qdiscs {
-				if qd.Choke == nil {
+			for _, qd := range objects[ns]["qdisc"] {
+				if qd.Choke == nil || qd.Msg.Ifindex != interf.Index {
 					continue
 				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
