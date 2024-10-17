@@ -95,70 +95,77 @@ func (col *HtbCollector) Collect(ch chan<- prometheus.Metric, objects map[string
 			// }
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
-			for _, qd := range objects[ns]["qdisc"] {
-				if qd.Htb == nil || qd.Msg.Ifindex != interf.Index {
+			for _, cl := range objects[ns]["class"] {
+				switch {
+				case cl.Htb == nil || cl.Msg.Ifindex != interf.Index:
+					continue
+				case cl.XStats == nil:
+					col.logger.Debug("class.xstats is nil")
+					continue
+				case cl.XStats.Htb == nil:
+					col.logger.Debug("class.xstats.htb is nil")
 					continue
 				}
-				handleMaj, handleMin := HandleStr(qd.Handle)
-				parentMaj, parentMin := HandleStr(qd.Parent)
+				handleMaj, handleMin := HandleStr(cl.Handle)
+				parentMaj, parentMin := HandleStr(cl.Parent)
 
 				ch <- prometheus.MustNewConstMetric(
 					col.borrows,
 					prometheus.CounterValue,
-					float64(qd.XStats.Htb.Borrows),
+					float64(cl.XStats.Htb.Borrows),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
 					interf.Attributes.Name,
-					qd.Kind,
+					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
 					col.cTokens,
 					prometheus.CounterValue,
-					float64(qd.XStats.Htb.CTokens),
+					float64(cl.XStats.Htb.CTokens),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
 					interf.Attributes.Name,
-					qd.Kind,
+					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
 					col.giants,
 					prometheus.CounterValue,
-					float64(qd.XStats.Htb.Giants),
+					float64(cl.XStats.Htb.Giants),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
 					interf.Attributes.Name,
-					qd.Kind,
+					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
 					col.lends,
 					prometheus.CounterValue,
-					float64(qd.XStats.Htb.Lends),
+					float64(cl.XStats.Htb.Lends),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
 					interf.Attributes.Name,
-					qd.Kind,
+					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)
 				ch <- prometheus.MustNewConstMetric(
 					col.tokens,
 					prometheus.CounterValue,
-					float64(qd.XStats.Htb.Tokens),
+					float64(cl.XStats.Htb.Tokens),
 					host,
 					ns,
 					fmt.Sprintf("%d", interf.Index),
 					interf.Attributes.Name,
-					qd.Kind,
+					cl.Kind,
 					fmt.Sprintf("%x:%x", handleMaj, handleMin),
 					fmt.Sprintf("%x:%x", parentMaj, parentMin),
 				)

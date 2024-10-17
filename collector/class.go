@@ -133,6 +133,9 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric, objects map[strin
 				if cl.Msg.Ifindex != interf.Index {
 					continue
 				}
+				if cl.Attribute.Kind == "fq_codel" {
+					continue
+				}
 				handleMaj, handleMin := HandleStr(cl.Handle)
 				parentMaj, parentMin := HandleStr(cl.Parent)
 
