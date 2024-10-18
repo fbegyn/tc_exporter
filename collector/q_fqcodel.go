@@ -40,12 +40,12 @@ func NewFqCodelQdiscCollector(netns map[string][]rtnetlink.LinkMessage, log *slo
 		netns:  netns,
 		ceMark: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "ce_mark"),
-			"fq_codel ce mark xstat",
+			"fq_codel packets above ce-threshold",
 			fqCodelLabels, nil,
 		),
 		dropOverlimit: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "drop_overlimit"),
-			"fq_codel drop overlimit xstat",
+			"fq_codel number of times max qdisc packet limit was hit",
 			fqCodelLabels, nil,
 		),
 		dropOvermemory: prometheus.NewDesc(
@@ -55,32 +55,32 @@ func NewFqCodelQdiscCollector(netns map[string][]rtnetlink.LinkMessage, log *slo
 		),
 		ecnMark: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "ecn_mark"),
-			"fq_codel ecn mark xstat",
+			"fq_codel nmber of packets we ECN marked instead of being dropped",
 			fqCodelLabels, nil,
 		),
 		maxPacket: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "max_packet"),
-			"fq_codel max packet xstat",
+			"fq_codel largest packet we’ve seen so far",
 			fqCodelLabels, nil,
 		),
 		memoryUsage: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "memory_usage"),
-			"fq_codel memory usage xstat",
+			"fq_codel memory usage in bytes",
 			fqCodelLabels, nil,
 		),
 		newFlowCount: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "new_flows_count"),
-			"fq_codel new flows count xstat",
+			"fq_codel number of times packets created a new flow",
 			fqCodelLabels, nil,
 		),
 		newFlowsLen: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "new_flows_len"),
-			"fq_codel new flows len xstat",
+			"fq_codel count of flows in new list",
 			fqCodelLabels, nil,
 		),
 		oldFlowsLen: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "fqcodel", "old_flows_len"),
-			"fq_codel old flows len xstat",
+			"fq_codel count of flows in old list",
 			fqCodelLabels, nil,
 		),
 	}, nil

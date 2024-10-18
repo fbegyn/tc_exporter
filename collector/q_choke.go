@@ -36,27 +36,27 @@ func NewChokeCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logge
 		netns:  netns,
 		early: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "choke", "early"),
-			"Choke early xstat",
+			"Choke early drops",
 			chokeLabels, nil,
 		),
 		marked: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "choke", "marked"),
-			"Choke marked xstat",
+			"Choke marked packets",
 			chokeLabels, nil,
 		),
 		matched: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "choke", "matched"),
-			"Choke matched xstat",
+			"Choke drops due to flow match",
 			chokeLabels, nil,
 		),
 		other: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "choke", "other"),
-			"Choke other xstat",
+			"Choke drops due to drop() call",
 			chokeLabels, nil,
 		),
 		pDrop: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "choke", "pdrop"),
-			"Choke pdrop xstat",
+			"Choke drops due to queue limit",
 			chokeLabels, nil,
 		),
 	}, nil

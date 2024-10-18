@@ -40,47 +40,47 @@ func NewCodelCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logge
 		netns:  netns,
 		ceMark: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "ce_mark"),
-			"Codel CE mark xstat",
+			"Codel number of CE marked packets because of ce-threshold",
 			codelLabels, nil,
 		),
 		count: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "count"),
-			"Codel count xstat",
+			"Codel how many drops we’ve done since the last time we entered dropping state",
 			codelLabels, nil,
 		),
 		dropNext: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "drop_next"),
-			"Codel drop next xstat",
+			"Codel time to drop next packet",
 			codelLabels, nil,
 		),
 		dropOverlimit: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "drop_overlimit"),
-			"Codel drop overlimit xstat",
+			"Codel number of times max qdisc packet limit was hit",
 			codelLabels, nil,
 		),
 		dropping: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "dropping"),
-			"Codel dropping xstat",
+			"Codel are we in a dropping state?",
 			codelLabels, nil,
 		),
 		ecnMark: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "ecn_mark"),
-			"Codel ecn mark xstat",
+			"Codel number of packets we’ve ECN marked instead of dropped",
 			codelLabels, nil,
 		),
 		lDelay: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "ldelay"),
-			"Codel ldelay xstat",
+			"Codel in-queue delay seen by most recently dequeued packet",
 			codelLabels, nil,
 		),
 		lastCount: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "last_count"),
-			"Codel last count xstat",
+			"Codel count at entry to dropping state",
 			codelLabels, nil,
 		),
 		maxPacket: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "codel", "max_packet"),
-			"Codel max packet xstat",
+			"Codel largest packet we’ve seen so far",
 			codelLabels, nil,
 		),
 	}, nil

@@ -42,22 +42,22 @@ func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog *slog.Logg
 		netns:  netns,
 		bytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "bytes_total"),
-			"Class counter",
+			"Number of enqueued bytes",
 			classlabels, nil,
 		),
 		packets: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "packets_total"),
-			"Class packet counter",
+			"Number of enqueued packets",
 			classlabels, nil,
 		),
 		bps: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "bps"),
-			"Class byte rate",
+			"Current flow byte rate",
 			classlabels, nil,
 		),
 		pps: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "pps"),
-			"Class packet rate",
+			"Current flow packet rate",
 			classlabels, nil,
 		),
 		backlog: prometheus.NewDesc(
@@ -67,12 +67,12 @@ func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog *slog.Logg
 		),
 		drops: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "drops_total"),
-			"Class queue drops",
+			"Packets dropped because of lack of resources",
 			classlabels, nil,
 		),
 		overlimits: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "class", "overlimits_total"),
-			"Class queue overlimits",
+			"Number of throttle events when this flow goes out of allocated bandwidth",
 			classlabels, nil,
 		),
 		qlen: prometheus.NewDesc(
@@ -133,8 +133,11 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric, objects map[strin
 				if cl.Msg.Ifindex != interf.Index {
 					continue
 				}
-				if cl.Attribute.Kind == "fq_codel" {
-					continue
+				switch cl.Attribute.Kind {
+				case "fq_codel":
+				        continue
+				case "cake":
+				        continue
 				}
 				handleMaj, handleMin := HandleStr(cl.Handle)
 				parentMaj, parentMin := HandleStr(cl.Parent)
