@@ -96,7 +96,7 @@ func main() {
 	// initialise the collector with the configured subcollectors
 	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, logger)
 	if err != nil {
-		logger.Error("msg", "failed to create TC collector", "err", err)
+		logger.Error("failed to create TC collector", "err", err.Error())
 	}
 	prometheus.MustRegister(collector)
 
@@ -108,7 +108,7 @@ func main() {
 	// Start listening for HTTP connections.
 	logger.Info("starting TC exporter", "listen-address", cf.ListenAddres)
 	if err := http.ListenAndServe(cf.ListenAddres, mux); err != nil {
-		logger.Error("msg", "cannot start TC exporter", "err", err)
+		logger.Error("cannot start TC exporter", "err", err.Error())
 	}
 }
 
