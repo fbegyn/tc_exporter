@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,9 +12,9 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/spf13/viper"
 
-	kingpin "github.com/alecthomas/kingpin/v2"
+	"github.com/alecthomas/kong"
+	kongtoml "github.com/alecthomas/kong-toml"
 )
 
 // Config datasructure representing the configuration file
@@ -23,60 +24,29 @@ type Config struct {
 	NetNS        map[string]NS
 }
 
-// NS holds a type alias so we can use it in the config file
-type NS struct {
-	Interfaces []string
+var cli App
+
+type App struct {
+	Config       string          `help:"location of the config path" default:"config.toml" name:"config-file"`
+	LogLevel     string          `help:"slog based log level" default:"info" name:"log-level"`
+	ListenAddres string          `help:"address to listen on" default:":9704" name:"listen-address"`
+	Collector    map[string]bool `name:"collector" help:"collectors to enable"`
+	NetNS        map[string]NS   `name:"netns"`
 }
 
-func main() {
-	// CLI arguments parsing
-	kingpin.Version(Version)
-	kingpin.Parse()
+// NS holds a type alias so we can use it in the config file
+type NS struct {
+	Interfaces []string `name:"interfaces"`
+}
 
-	// Start up the logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Read the data from the config file
-	// currently the following options can be used in the configuration folder
-	// interfaces: array - array holding the dvice names
-	logger.Info("reading config file")
-	// Set config locations
-	viper.SetConfigName("config")
-	viper.SetConfigType("toml")
-	viper.AddConfigPath("/etc/tc_exporter/")
-	viper.AddConfigPath("$HOME/.config/tc_exporter/")
-	viper.AddConfigPath(".")
-	// Set defaults
-	viper.SetDefault("listen-address", ":9704")
-	viper.SetDefault("log-level", slog.LevelInfo)
-	// Read config file
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logger.Error("could not find the config file")
-		} else {
-			logger.Error("something went wrong while reading the config", "err", err)
-		}
-	}
-
-	var cf Config
-	cf.ListenAddres = viper.GetString("listen-address")
-	cf.LogLevel = slog.Level(viper.GetInt("log-level"))
-	err := viper.Unmarshal(&cf)
-	if err != nil {
-		logger.Error("failed to read config file", "error", err)
-	}
-	logger.Info("successfully read config file")
-
-	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: cf.LogLevel}))
-	slog.SetDefault(logger)
-
+func (a *App) Run(logger *slog.Logger) error {
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
 
 	// fetch all the interfaces from the configured network namespaces
 	// and store them in a map
 	netns := make(map[string][]rtnetlink.LinkMessage)
-	for ns, sp := range cf.NetNS {
+	for ns, sp := range a.NetNS {
 		interfaces, err := getInterfacesInNetNS(sp.Interfaces, ns)
 		if err != nil {
 			slog.Error("failed to get interfaces from ns", "err", err, "netns", ns)
@@ -103,6 +73,7 @@ func main() {
 	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, logger)
 	if err != nil {
 		slog.Error("failed to create TC collector", "err", err.Error())
+		return err
 	}
 	prometheus.MustRegister(collector)
 
@@ -118,9 +89,53 @@ func main() {
 	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
 
 	// Start listening for HTTP connections.
-	slog.Info("starting TC exporter", "listen-address", cf.ListenAddres)
-	if err := http.ListenAndServe(cf.ListenAddres, mux); err != nil {
+	slog.Info("starting TC exporter", "listen-address", a.ListenAddres)
+	if err := http.ListenAndServe(a.ListenAddres, mux); err != nil {
 		slog.Error("cannot start TC exporter", "err", err.Error())
+	}
+	return nil
+}
+
+func main() {
+	// CLI arguments parsing
+	appCtx := kong.Parse(&cli,
+		kong.Name("tc-exporter"),
+		kong.Description("prometheus exporter for linux traffic control"),
+		kong.UsageOnError(),
+		kong.Vars{
+			"version": "v0.8.0-rc1",
+		},
+		kong.Configuration(
+			kongtoml.Loader,
+			"/etc/tc-exporter/config.toml",
+			"$HOME/.config/tc_exporter/config.toml",
+			"./config.toml",
+		),
+	)
+
+	fmt.Println(cli)
+
+	var logLevel slog.Level
+	switch cli.LogLevel {
+	case "info":
+		logLevel = slog.LevelInfo
+	case "error":
+		logLevel = slog.LevelError
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "debug":
+		logLevel = slog.LevelDebug
+	default:
+		logLevel = slog.LevelInfo
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	slog.SetDefault(logger)
+
+	err := appCtx.Run(logger)
+	if err != nil {
+		slog.Error("failed to run kong app", "error", err)
+		os.Exit(5)
 	}
 }
 

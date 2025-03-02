@@ -1,5 +1,5 @@
 listen-address = ":9704"
-log-level = 0
+log-level = "debug"
 
 [netns.default]
 interfaces = ['enp12s0','dummy01']
