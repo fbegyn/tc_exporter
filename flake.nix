@@ -54,6 +54,7 @@
           nfpm
           goreleaser
           gnumake
+          graphviz
         ];
       };
     });
