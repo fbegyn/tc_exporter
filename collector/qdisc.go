@@ -121,6 +121,28 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 				handleMaj, handleMin := HandleStr(qd.Handle)
 				parentMaj, parentMin := HandleStr(qd.Parent)
 				var bytes, packets, drops, overlimits, qlen, backlog float64
+				if qd.Stats2 != nil {
+					bytes = float64(qd.Stats2.Bytes)
+					packets = float64(qd.Stats2.Packets)
+					drops = float64(qd.Stats2.Drops)
+					overlimits = float64(qd.Stats2.Overlimits)
+					qlen = float64(qd.Stats2.Qlen)
+					backlog = float64(qd.Stats2.Backlog)
+					ch <- prometheus.MustNewConstMetric(
+						qc.stats.requeues,
+						prometheus.CounterValue,
+						float64(qd.Stats2.Requeues),
+						host,
+						ns,
+						fmt.Sprintf("%d", interf.Index),
+						interf.Attributes.Name,
+						qd.Kind,
+						fmt.Sprintf("%x:%x", handleMaj, handleMin),
+						fmt.Sprintf("%x:%x", parentMaj, parentMin),
+					)
+				} else {
+					qc.logger.Debug("stats2 struct is empty for this qdisc", "qdisc", qd)
+				}
 				if qd.Stats != nil {
 					bytes = float64(qd.Stats.Bytes)
 					packets = float64(qd.Stats.Packets)
@@ -154,28 +176,6 @@ func (qc *QdiscCollector) Collect(ch chan<- prometheus.Metric) {
 					)
 				} else {
 					qc.logger.Debug("stats struct is empty for this qdisc", "qdisc", qd)
-				}
-				if qd.Stats2 != nil {
-					bytes = float64(qd.Stats2.Bytes)
-					packets = float64(qd.Stats2.Packets)
-					drops = float64(qd.Stats2.Drops)
-					overlimits = float64(qd.Stats2.Overlimits)
-					qlen = float64(qd.Stats2.Qlen)
-					backlog = float64(qd.Stats2.Backlog)
-					ch <- prometheus.MustNewConstMetric(
-						qc.stats.requeues,
-						prometheus.CounterValue,
-						float64(qd.Stats2.Requeues),
-						host,
-						ns,
-						fmt.Sprintf("%d", interf.Index),
-						interf.Attributes.Name,
-						qd.Kind,
-						fmt.Sprintf("%x:%x", handleMaj, handleMin),
-						fmt.Sprintf("%x:%x", parentMaj, parentMin),
-					)
-				} else {
-					qc.logger.Debug("stats2 struct is empty for this qdisc", "qdisc", qd)
 				}
 				if (qd.Stats != nil) || (qd.Stats2 != nil) {
 					ch <- prometheus.MustNewConstMetric(
@@ -263,6 +263,28 @@ func (qc *QdiscCollector) CollectObject(ch chan<- prometheus.Metric, host, ns st
 	parentMaj, parentMin := HandleStr(qd.Parent)
 
 	var bytes, packets, drops, overlimits, qlen, backlog float64
+	if qd.Stats2 != nil {
+		bytes = float64(qd.Stats2.Bytes)
+		packets = float64(qd.Stats2.Packets)
+		drops = float64(qd.Stats2.Drops)
+		overlimits = float64(qd.Stats2.Overlimits)
+		qlen = float64(qd.Stats2.Qlen)
+		backlog = float64(qd.Stats2.Backlog)
+		ch <- prometheus.MustNewConstMetric(
+			qc.stats.requeues,
+			prometheus.CounterValue,
+			float64(qd.Stats2.Requeues),
+			host,
+			ns,
+			fmt.Sprintf("%d", interf.Index),
+			interf.Attributes.Name,
+			qd.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+	} else {
+		qc.logger.Debug("stats2 struct is empty for this qdisc", "qdisc", qd)
+	}
 	if qd.Stats != nil {
 		bytes = float64(qd.Stats.Bytes)
 		packets = float64(qd.Stats.Packets)
@@ -296,28 +318,6 @@ func (qc *QdiscCollector) CollectObject(ch chan<- prometheus.Metric, host, ns st
 		)
 	} else {
 		qc.logger.Debug("stats struct is empty for this qdisc", "qdisc", qd)
-	}
-	if qd.Stats2 != nil {
-		bytes = float64(qd.Stats2.Bytes)
-		packets = float64(qd.Stats2.Packets)
-		drops = float64(qd.Stats2.Drops)
-		overlimits = float64(qd.Stats2.Overlimits)
-		qlen = float64(qd.Stats2.Qlen)
-		backlog = float64(qd.Stats2.Backlog)
-		ch <- prometheus.MustNewConstMetric(
-			qc.stats.requeues,
-			prometheus.CounterValue,
-			float64(qd.Stats2.Requeues),
-			host,
-			ns,
-			fmt.Sprintf("%d", interf.Index),
-			interf.Attributes.Name,
-			qd.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-	} else {
-		qc.logger.Debug("stats2 struct is empty for this qdisc", "qdisc", qd)
 	}
 	if (qd.Stats != nil) || (qd.Stats2 != nil) {
 		ch <- prometheus.MustNewConstMetric(

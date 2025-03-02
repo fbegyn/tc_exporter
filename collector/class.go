@@ -128,6 +128,26 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 				parentMaj, parentMin := HandleStr(cl.Parent)
 
 				var bytes, packets, drops, overlimits, qlen, backlog float64
+				if cl.Stats2 != nil {
+					bytes = float64(cl.Stats2.Bytes)
+					packets = float64(cl.Stats2.Packets)
+					drops = float64(cl.Stats2.Drops)
+					overlimits = float64(cl.Stats2.Overlimits)
+					qlen = float64(cl.Stats2.Qlen)
+					backlog = float64(cl.Stats2.Backlog)
+					ch <- prometheus.MustNewConstMetric(
+						cc.stats.requeues,
+						prometheus.CounterValue,
+						float64(cl.Stats2.Requeues),
+						host,
+						ns,
+						fmt.Sprintf("%d", interf.Index),
+						interf.Attributes.Name,
+						cl.Kind,
+						fmt.Sprintf("%x:%x", handleMaj, handleMin),
+						fmt.Sprintf("%x:%x", parentMaj, parentMin),
+					)
+				}
 				if cl.Stats != nil {
 					bytes = float64(cl.Stats.Bytes)
 					packets = float64(cl.Stats.Packets)
@@ -151,26 +171,6 @@ func (cc *ClassCollector) Collect(ch chan<- prometheus.Metric) {
 						cc.stats.pps,
 						prometheus.GaugeValue,
 						float64(cl.Stats.Pps),
-						host,
-						ns,
-						fmt.Sprintf("%d", interf.Index),
-						interf.Attributes.Name,
-						cl.Kind,
-						fmt.Sprintf("%x:%x", handleMaj, handleMin),
-						fmt.Sprintf("%x:%x", parentMaj, parentMin),
-					)
-				}
-				if cl.Stats2 != nil {
-					bytes = float64(cl.Stats2.Bytes)
-					packets = float64(cl.Stats2.Packets)
-					drops = float64(cl.Stats2.Drops)
-					overlimits = float64(cl.Stats2.Overlimits)
-					qlen = float64(cl.Stats2.Qlen)
-					backlog = float64(cl.Stats2.Backlog)
-					ch <- prometheus.MustNewConstMetric(
-						cc.stats.requeues,
-						prometheus.CounterValue,
-						float64(cl.Stats2.Requeues),
 						host,
 						ns,
 						fmt.Sprintf("%d", interf.Index),
@@ -267,6 +267,28 @@ func (cc *ClassCollector) CollectObject(ch chan<- prometheus.Metric, host, ns st
 	parentMaj, parentMin := HandleStr(cl.Parent)
 
 	var bytes, packets, drops, overlimits, qlen, backlog float64
+	if cl.Stats2 != nil {
+		bytes = float64(cl.Stats2.Bytes)
+		packets = float64(cl.Stats2.Packets)
+		drops = float64(cl.Stats2.Drops)
+		overlimits = float64(cl.Stats2.Overlimits)
+		qlen = float64(cl.Stats2.Qlen)
+		backlog = float64(cl.Stats2.Backlog)
+		ch <- prometheus.MustNewConstMetric(
+			cc.stats.requeues,
+			prometheus.CounterValue,
+			float64(cl.Stats2.Requeues),
+			host,
+			ns,
+			fmt.Sprintf("%d", interf.Index),
+			interf.Attributes.Name,
+			cl.Kind,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+	} else {
+		cc.logger.Debug("stats2 struct is empty for this class", "class", cl)
+	}
 	if cl.Stats != nil {
 		bytes = float64(cl.Stats.Bytes)
 		packets = float64(cl.Stats.Packets)
@@ -300,28 +322,6 @@ func (cc *ClassCollector) CollectObject(ch chan<- prometheus.Metric, host, ns st
 		)
 	} else {
 		cc.logger.Debug("stats struct is empty for this class", "class", cl)
-	}
-	if cl.Stats2 != nil {
-		bytes = float64(cl.Stats2.Bytes)
-		packets = float64(cl.Stats2.Packets)
-		drops = float64(cl.Stats2.Drops)
-		overlimits = float64(cl.Stats2.Overlimits)
-		qlen = float64(cl.Stats2.Qlen)
-		backlog = float64(cl.Stats2.Backlog)
-		ch <- prometheus.MustNewConstMetric(
-			cc.stats.requeues,
-			prometheus.CounterValue,
-			float64(cl.Stats2.Requeues),
-			host,
-			ns,
-			fmt.Sprintf("%d", interf.Index),
-			interf.Attributes.Name,
-			cl.Kind,
-			fmt.Sprintf("%x:%x", handleMaj, handleMin),
-			fmt.Sprintf("%x:%x", parentMaj, parentMin),
-		)
-	} else {
-		cc.logger.Debug("stats2 struct is empty for this class", "class", cl)
 	}
 	if (cl.Stats != nil) || (cl.Stats2 != nil) {
 		ch <- prometheus.MustNewConstMetric(
