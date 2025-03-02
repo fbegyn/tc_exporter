@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -29,7 +30,7 @@ type FqCodelQdiscCollector struct {
 }
 
 // NewFqCodelQdiscCollector create a new QdiscCollector given a network interface
-func NewFqCodelQdiscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+func NewFqCodelQdiscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector
 	log = log.With("collector", "fq_codel")
 	log.Info("making fq_codel qdisc collector")
@@ -240,4 +241,119 @@ func (col *FqCodelQdiscCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+}
+
+// CollectObject fetches and updates the data the collector is exporting
+func (col *FqCodelQdiscCollector) CollectObject(ch chan<- prometheus.Metric, host, ns string, interf rtnetlink.LinkMessage, qd tc.Object) {
+	handleMaj, handleMin := HandleStr(qd.Handle)
+	parentMaj, parentMin := HandleStr(qd.Parent)
+
+	ch <- prometheus.MustNewConstMetric(
+		col.ceMark,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.CeMark),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.dropOverlimit,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.DropOverlimit),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.dropOvermemory,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.DropOvermemory),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.ecnMark,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.EcnMark),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.maxPacket,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.MaxPacket),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.memoryUsage,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.MemoryUsage),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.newFlowCount,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.NewFlowCount),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.newFlowsLen,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.NewFlowsLen),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.oldFlowsLen,
+		prometheus.CounterValue,
+		float64(qd.XStats.FqCodel.Qd.OldFlowsLen),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
 }

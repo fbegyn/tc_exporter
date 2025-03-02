@@ -18,7 +18,8 @@ import (
 
 // Config datasructure representing the configuration file
 type Config struct {
-	ListenAddres string ``
+	LogLevel     slog.Level
+	ListenAddres string
 	NetNS        map[string]NS
 }
 
@@ -47,6 +48,7 @@ func main() {
 	viper.AddConfigPath(".")
 	// Set defaults
 	viper.SetDefault("listen-address", ":9704")
+	viper.SetDefault("log-level", slog.LevelInfo)
 	// Read config file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -58,11 +60,15 @@ func main() {
 
 	var cf Config
 	cf.ListenAddres = viper.GetString("listen-address")
+	cf.LogLevel = slog.Level(viper.GetInt("log-level"))
 	err := viper.Unmarshal(&cf)
 	if err != nil {
 		logger.Error("failed to read config file", "error", err)
 	}
 	logger.Info("successfully read config file")
+
+	logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: cf.LogLevel}))
+	slog.SetDefault(logger)
 
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
@@ -73,42 +79,48 @@ func main() {
 	for ns, sp := range cf.NetNS {
 		interfaces, err := getInterfacesInNetNS(sp.Interfaces, ns)
 		if err != nil {
-			logger.Error("failed to get interfaces from ns", "err", err, "netns", ns)
+			slog.Error("failed to get interfaces from ns", "err", err, "netns", ns)
 		}
 		netns[ns] = interfaces
 	}
 
 	enabledCollectors := map[string]bool{
-		"cbq": true,
-	        "choke": true,
-	        "codel": true,
-	        "fq": true,
-	        "fq_codel": true,
-	        "hfsc_qdisc": true,
-	        "service_curve": true,
-	        "htb": true,
-	        "pie": true,
-	        "red": true,
-	        "sfb": true,
-	        "sfq": true,
+		"cbq":           true,
+		"choke":         true,
+		"codel":         true,
+		"fq":            true,
+		"fq_codel":      true,
+		"hfsc_qdisc":    true,
+		"service_curve": true,
+		"htb":           true,
+		"pie":           true,
+		"red":           true,
+		"sfb":           true,
+		"sfq":           true,
 	}
 
 	// initialise the collector with the configured subcollectors
 	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, logger)
 	if err != nil {
-		logger.Error("failed to create TC collector", "err", err.Error())
+		slog.Error("failed to create TC collector", "err", err.Error())
 	}
 	prometheus.MustRegister(collector)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
 
 	// Start listening for HTTP connections.
-	logger.Info("starting TC exporter", "listen-address", cf.ListenAddres)
+	slog.Info("starting TC exporter", "listen-address", cf.ListenAddres)
 	if err := http.ListenAndServe(cf.ListenAddres, mux); err != nil {
-		logger.Error("cannot start TC exporter", "err", err.Error())
+		slog.Error("cannot start TC exporter", "err", err.Error())
 	}
 }
 

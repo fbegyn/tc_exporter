@@ -26,7 +26,7 @@ type HfscCollector struct {
 }
 
 // NewHfscCollector create a new QdiscCollector given a network interface
-func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector
 	log = log.With("collector", "hfsc")
 	log.Info("making hfsc collector")
@@ -149,6 +149,61 @@ func (col *HfscCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
+// CollectObject fetches and updates the data the collector is exporting
+func (col *HfscCollector) CollectObject(ch chan<- prometheus.Metric, host, ns string, interf rtnetlink.LinkMessage, qd tc.Object) {
+	handleMaj, handleMin := HandleStr(qd.Handle)
+	parentMaj, parentMin := HandleStr(qd.Parent)
+
+	ch <- prometheus.MustNewConstMetric(
+		col.level,
+		prometheus.CounterValue,
+		float64(qd.XStats.Hfsc.Level),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.period,
+		prometheus.CounterValue,
+		float64(qd.XStats.Hfsc.Period),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.rtWork,
+		prometheus.CounterValue,
+		float64(qd.XStats.Hfsc.RtWork),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.work,
+		prometheus.CounterValue,
+		float64(qd.XStats.Hfsc.Work),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+}
+
 // ServiceCurveCollector is the object that will collect Service Curve data for the interface. It is
 // mainly used to determine the current limits imposed by the service curve
 type ServiceCurveCollector struct {
@@ -162,7 +217,7 @@ type ServiceCurveCollector struct {
 }
 
 // NewServiceCurveCollector create a new ServiceCurveCollector given a network interface
-func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *slog.Logger) (prometheus.Collector, error) {
+func NewServiceCurveCollector(netns map[string][]rtnetlink.LinkMessage, sclog *slog.Logger) (ObjectCollector, error) {
 	// Set up the logger for the service curve collector
 	sclog = sclog.With("collector", "service_curve")
 	sclog.Info("making hfsc service curve collector")
@@ -288,4 +343,67 @@ func (c *ServiceCurveCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	c.Mutex.Unlock()
 
+}
+
+// CollectObject fetches and updates the data the collector is exporting
+func (c *ServiceCurveCollector) CollectObject(ch chan<- prometheus.Metric, host, ns string, interf rtnetlink.LinkMessage, cl tc.Object) {
+	handleMaj, handleMin := HandleStr(cl.Handle)
+	parentMaj, parentMin := HandleStr(cl.Parent)
+
+	// If the class is a HFSC class, fetch the curve information. Otherwise continue to the next
+	// class since we are only intrested in HFSC here
+	if cl.Hfsc == nil {
+		return
+	}
+
+	c.Mutex.Lock()
+	c.curves["fsc"] = cl.Hfsc.Fsc
+	c.curves["rsc"] = cl.Hfsc.Rsc
+	c.curves["usc"] = cl.Hfsc.Usc
+
+	// For each curve, report the settings of the service curve the channel
+	for typ, sc := range c.curves {
+		// If a certain type of curve is not defined, skip over it. It also functions as another
+		// safety check so the function does not error on nil curves
+		if sc == nil {
+			continue
+		}
+		ch <- prometheus.MustNewConstMetric(
+			c.Burst,
+			prometheus.GaugeValue,
+			float64(sc.M1),
+			host,
+			ns,
+			fmt.Sprintf("%d", interf.Index),
+			interf.Attributes.Name,
+			typ,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			c.Delay,
+			prometheus.GaugeValue,
+			float64(sc.D),
+			host,
+			ns,
+			fmt.Sprintf("%d", interf.Index),
+			interf.Attributes.Name,
+			typ,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+		ch <- prometheus.MustNewConstMetric(
+			c.Rate,
+			prometheus.GaugeValue,
+			float64(sc.M2),
+			host,
+			ns,
+			fmt.Sprintf("%d", interf.Index),
+			interf.Attributes.Name,
+			typ,
+			fmt.Sprintf("%x:%x", handleMaj, handleMin),
+			fmt.Sprintf("%x:%x", parentMaj, parentMin),
+		)
+	}
+	c.Mutex.Unlock()
 }

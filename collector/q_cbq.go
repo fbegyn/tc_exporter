@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -24,7 +25,7 @@ type CbqCollector struct {
 }
 
 // NewCbqCollector create a new QdiscCollector given a network interface
-func NewCbqCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (prometheus.Collector, error) {
+func NewCbqCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector
 	log = log.With("collector", "cbq")
 	log.Debug("making cbq collector")
@@ -70,6 +71,7 @@ func (col *CbqCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect fetches and updates the data the collector is exporting
+// func (col *CbqCollector) Collect(ch chan<- prometheus.Metric) {
 func (col *CbqCollector) Collect(ch chan<- prometheus.Metric) {
 	// fetch the host for useage later on
 	host, err := os.Hostname()
@@ -145,4 +147,60 @@ func (col *CbqCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
+}
+
+// CollectObject fetches and updates the data the collector is exporting
+// func (col *CbqCollector) Collect(ch chan<- prometheus.Metric) {
+func (col *CbqCollector) CollectObject(ch chan<- prometheus.Metric, host, ns string, interf rtnetlink.LinkMessage, qd tc.Object) {
+	handleMaj, handleMin := HandleStr(qd.Handle)
+	parentMaj, parentMin := HandleStr(qd.Parent)
+
+	ch <- prometheus.MustNewConstMetric(
+		col.avgIdle,
+		prometheus.CounterValue,
+		float64(qd.XStats.Cbq.AvgIdle),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.borrows,
+		prometheus.CounterValue,
+		float64(qd.XStats.Cbq.Borrows),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.overactions,
+		prometheus.CounterValue,
+		float64(qd.XStats.Cbq.Overactions),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
+	ch <- prometheus.MustNewConstMetric(
+		col.undertime,
+		prometheus.CounterValue,
+		float64(qd.XStats.Cbq.Undertime),
+		host,
+		ns,
+		fmt.Sprintf("%d", interf.Index),
+		interf.Attributes.Name,
+		qd.Kind,
+		fmt.Sprintf("%x:%x", handleMaj, handleMin),
+		fmt.Sprintf("%x:%x", parentMaj, parentMin),
+	)
 }

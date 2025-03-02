@@ -6,6 +6,7 @@ import (
 	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/mdlayher/netlink"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sys/unix"
 )
 
@@ -133,4 +134,16 @@ func getFilters(devid uint32, ns string) ([]tc.Object, error) {
 	}
 
 	return fl, nil
+}
+
+type stats struct {
+	bytes      *prometheus.Desc
+	packets    *prometheus.Desc
+	drops      *prometheus.Desc
+	overlimits *prometheus.Desc
+	bps        *prometheus.Desc
+	pps        *prometheus.Desc
+	qlen       *prometheus.Desc
+	backlog    *prometheus.Desc
+	requeues   *prometheus.Desc
 }

@@ -14,11 +14,21 @@ It is possible to filter the interface to fetch data from by using a `config.tom
 structure and keys
 
 * `listen-address`: specifies the address on which the exporter will be running
+* `log-level`: specifies the log level based on [slog levels](https://pkg.go.dev/log/slog#Level)
+   ```go
+   const (
+	LevelDebug Level = -4
+	LevelInfo  Level = 0
+	LevelWarn  Level = 4
+	LevelError Level = 8
+   )
+   ```
 * `[netns.<netns name>]`: Map that specifies which network namespaces to monitor by name
   * `interfaces`: string array with the names of the interfaces that should be exported
 
 ```
 listen-address = ":9704"
+log-level = 0
 
 [netns.default]
 interfaces = ['dummy','eno1']
