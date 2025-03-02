@@ -107,13 +107,15 @@ func main() {
 		},
 		kong.Configuration(
 			kongtoml.Loader,
-			"/etc/tc-exporter/config.toml",
-			"$HOME/.config/tc_exporter/config.toml",
-			"./config.toml",
 		),
 	)
+	rl, err := appCtx.LoadConfig(cli.Config)
+	if err != nil {
+		slog.Error("failed to read config", "error", err)
+		os.Exit(1)
+	}
 
-	fmt.Println(cli)
+	fmt.Println(rl)
 
 	var logLevel slog.Level
 	switch cli.LogLevel {
@@ -132,10 +134,10 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
 
-	err := appCtx.Run(logger)
+	err = appCtx.Run(logger)
 	if err != nil {
 		slog.Error("failed to run kong app", "error", err)
-		os.Exit(5)
+		os.Exit(2)
 	}
 }
 
