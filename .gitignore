@@ -11,3 +11,5 @@ dist/
 
 .direnv
 .vagrant
+
+test.toml
