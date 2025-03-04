@@ -1,21 +1,21 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"net/http/pprof"
 
+	"github.com/alecthomas/kong"
+	kongtoml "github.com/alecthomas/kong-toml"
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/alecthomas/kong"
-	kongtoml "github.com/alecthomas/kong-toml"
 )
+
+var cli App
 
 // Config datasructure representing the configuration file
 type Config struct {
@@ -24,19 +24,30 @@ type Config struct {
 	NetNS        map[string]NS
 }
 
-var cli App
-
-type App struct {
-	Config       string          `help:"location of the config path" default:"config.toml" name:"config-file"`
-	LogLevel     string          `help:"slog based log level" default:"info" name:"log-level"`
-	ListenAddres string          `help:"address to listen on" default:":9704" name:"listen-address"`
-	Collector    map[string]bool `name:"collector" help:"collectors to enable"`
-	NetNS        map[string]NS   `name:"netns"`
-}
-
 // NS holds a type alias so we can use it in the config file
 type NS struct {
 	Interfaces []string `name:"interfaces"`
+}
+
+// App holds are the
+type App struct {
+	Config        kong.ConfigFlag `help:"location of the config path" default:"config.toml" name:"config-file"`
+	LogLevel      string          `help:"slog based log level" default:"info" name:"log-level"`
+	ListenAddres  string          `help:"address to listen on" default:":9704" name:"listen-address"`
+	NetNS         map[string]NS   `name:"netns"`
+	QdiscEnable   bool            `help:"enable the qdisc collector" negatable:"" default:"true" name:"collector-qdisc"`
+	ClassEnable   bool            `help:"enable the class collector" negatable:"" default:"true" name:"collector-class"`
+	CbqEnable     bool            `help:"enable the cbq collector" negatable:"" default:"false" name:"collector-cbq"`
+	ChokeEnable   bool            `help:"enable the choke collector" negatable:"" default:"false" name:"collector-choke"`
+	CodelEnable   bool            `help:"enable the codel collector" negatable:"" default:"false" name:"collector-codel"`
+	FqEnable      bool            `help:"enable the fq collector" negatable:"" default:"false" name:"collector-fq"`
+	FqcodelEnable bool            `help:"enable the fqcodel collector" negatable:"" default:"false" name:"collector-fqcodel"`
+	HfscEnable    bool            `help:"enable the hfsc collector" negatable:"" default:"false" name:"collector-hfsc"`
+	HtbEnable     bool            `help:"enable the htb collector" negatable:"" default:"false" name:"collector-htb"`
+	PieEnable     bool            `help:"enable the pie collector" negatable:"" default:"false" name:"collector-pie"`
+	RedEnable     bool            `help:"enable the red collector" negatable:"" default:"false" name:"collector-red"`
+	SfbEnable     bool            `help:"enable the sfb collector" negatable:"" default:"false" name:"collector-sfb"`
+	SfqEnable     bool            `help:"enable the sfq collector" negatable:"" default:"false" name:"collector-sfq"`
 }
 
 func (a *App) Run(logger *slog.Logger) error {
@@ -55,18 +66,20 @@ func (a *App) Run(logger *slog.Logger) error {
 	}
 
 	enabledCollectors := map[string]bool{
-		"cbq":           true,
-		"choke":         true,
-		"codel":         true,
-		"fq":            true,
-		"fq_codel":      true,
-		"hfsc_qdisc":    true,
-		"service_curve": true,
-		"htb":           true,
-		"pie":           true,
-		"red":           true,
-		"sfb":           true,
-		"sfq":           true,
+		"qdisc":         a.QdiscEnable,
+		"class":         a.ClassEnable,
+		"cbq":           a.CbqEnable,
+		"choke":         a.ChokeEnable,
+		"codel":         a.CodelEnable,
+		"fq":            a.FqEnable,
+		"fq_codel":      a.FqcodelEnable,
+		"hfsc_qdisc":    a.HfscEnable,
+		"service_curve": a.HfscEnable,
+		"htb":           a.HtbEnable,
+		"pie":           a.PieEnable,
+		"red":           a.RedEnable,
+		"sfb":           a.SfbEnable,
+		"sfq":           a.SfqEnable,
 	}
 
 	// initialise the collector with the configured subcollectors
@@ -107,15 +120,11 @@ func main() {
 		},
 		kong.Configuration(
 			kongtoml.Loader,
+			"/etc/tc_exporter/config.toml",
+			"~/.config/tc_exporter/config.toml",
+			"./config.toml",
 		),
 	)
-	rl, err := appCtx.LoadConfig(cli.Config)
-	if err != nil {
-		slog.Error("failed to read config", "error", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(rl)
 
 	var logLevel slog.Level
 	switch cli.LogLevel {
@@ -134,7 +143,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
 
-	err = appCtx.Run(logger)
+	err := appCtx.Run(logger)
 	if err != nil {
 		slog.Error("failed to run kong app", "error", err)
 		os.Exit(2)
