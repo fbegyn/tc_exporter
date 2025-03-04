@@ -31,7 +31,7 @@ type NS struct {
 
 // App holds are the
 type App struct {
-	Config        kong.ConfigFlag `help:"location of the config path" default:"config.toml" name:"config-file"`
+	Config        kong.ConfigFlag `help:"location of the config path" name:"config-file"`
 	LogLevel      string          `help:"slog based log level" default:"info" name:"log-level"`
 	ListenAddres  string          `help:"address to listen on" default:":9704" name:"listen-address"`
 	NetNS         map[string]NS   `name:"netns"`
