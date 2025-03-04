@@ -1,5 +1,7 @@
 # This is an example .goreleaser.yml file with some sensible defaults.
 # Make sure to check the documentation at https://goreleaser.com
+---
+version: 2
 before:
   hooks:
     # You may remove this if you don't use go modules.
@@ -7,9 +9,7 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
 builds:
-  - env:
-      - CGO_ENABLED=0
-    goos:
+  - goos:
       - linux
     goarch:
       - amd64
@@ -17,7 +17,6 @@ builds:
     main: ./cmd/tc_exporter
     flags:
       - "-trimpath"
-      - "-tags netgo,osusergo"
     ldflags:
       - "-w -s"
       - "-X main.Branch={{ .Branch }}"
