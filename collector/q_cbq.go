@@ -3,7 +3,6 @@ package tccollector
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
@@ -67,85 +66,6 @@ func (col *CbqCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	for _, d := range ds {
 		ch <- d
-	}
-}
-
-// Collect fetches and updates the data the collector is exporting
-// func (col *CbqCollector) Collect(ch chan<- prometheus.Metric) {
-func (col *CbqCollector) Collect(ch chan<- prometheus.Metric) {
-	// fetch the host for useage later on
-	host, err := os.Hostname()
-	if err != nil {
-		col.logger.Error("failed to fetch hostname", "err", err)
-	}
-
-	// iterate through the netns and devices
-	for ns, devices := range col.netns {
-		for _, interf := range devices {
-			// fetch all the the qdisc for this interface
-			qdiscs, err := getQdiscs(uint32(interf.Index), ns)
-			if err != nil {
-				col.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
-			}
-
-			// iterate through all the qdiscs and sent the data to the prometheus metric channel
-			for _, qd := range qdiscs {
-				if qd.Cbq == nil {
-					continue
-				}
-				handleMaj, handleMin := HandleStr(qd.Handle)
-				parentMaj, parentMin := HandleStr(qd.Parent)
-
-				ch <- prometheus.MustNewConstMetric(
-					col.avgIdle,
-					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.AvgIdle),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					col.borrows,
-					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.Borrows),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					col.overactions,
-					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.Overactions),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-				ch <- prometheus.MustNewConstMetric(
-					col.undertime,
-					prometheus.CounterValue,
-					float64(qd.XStats.Cbq.Undertime),
-					host,
-					ns,
-					fmt.Sprintf("%d", interf.Index),
-					interf.Attributes.Name,
-					qd.Kind,
-					fmt.Sprintf("%x:%x", handleMaj, handleMin),
-					fmt.Sprintf("%x:%x", parentMaj, parentMin),
-				)
-			}
-		}
 	}
 }
 

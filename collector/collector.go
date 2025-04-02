@@ -19,7 +19,7 @@ type TcCollector struct {
 }
 
 type ObjectCollector interface {
-	prometheus.Collector
+	Describe(chan<- *prometheus.Desc)
 	CollectObject(ch chan<- prometheus.Metric, hostname, ns string, interf rtnetlink.LinkMessage, qd tc.Object)
 }
 
