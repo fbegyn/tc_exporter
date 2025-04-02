@@ -90,7 +90,7 @@ func (col *HfscCollector) Collect(ch chan<- prometheus.Metric) {
 
 			// iterate through all the qdiscs and sent the data to the prometheus metric channel
 			for _, qd := range qdiscs {
-				if qd.Hfsc == nil {
+				if qd.Hfsc == nil || qd.XStats == nil {
 					continue
 				}
 				handleMaj, handleMin := HandleStr(qd.Handle)
@@ -151,6 +151,10 @@ func (col *HfscCollector) Collect(ch chan<- prometheus.Metric) {
 
 // CollectObject fetches and updates the data the collector is exporting
 func (col *HfscCollector) CollectObject(ch chan<- prometheus.Metric, host, ns string, interf rtnetlink.LinkMessage, qd tc.Object) {
+	if qd.XStats == nil {
+		return
+	}
+
 	handleMaj, handleMin := HandleStr(qd.Handle)
 	parentMaj, parentMin := HandleStr(qd.Parent)
 
