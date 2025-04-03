@@ -111,6 +111,11 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 					return nil, err
 				}
 				collectors["htb"] = coll
+				coll, err = NewHtbCollector(netns, logger)
+				if err != nil {
+					return nil, err
+				}
+				collectors["htb_class"] = coll
 			case "pie":
 				logger.Debug("registering collector", "collector", "pie", "key", "pie")
 				coll, err := NewPieCollector(netns, logger)
@@ -230,13 +235,16 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			for _, cl := range classes {
 				t.logger.Debug("class type", "kind", cl.Kind)
-				t.logger.Debug("passing class to class collector", "class", cl)
 				t.Collectors["class"].CollectObject(ch, host, ns, interf, cl)
 				if cl.XStats == nil {
 					t.logger.Debug("XStats struct is empty for this class", "class", cl, "interface", interf.Attributes.Name)
 					continue
 				}
+				t.logger.Debug("passing class to class collector", "class", cl)
 				switch cl.Kind {
+				case "htb":
+					t.logger.Debug("passing class to htb collector", "class", cl)
+					t.Collectors["htb_class"].CollectObject(ch, host, ns, interf, cl)
 				case "hfsc":
 					t.logger.Debug("passing class to hfsc collector", "class", cl)
 					t.Collectors["hfsc"].CollectObject(ch, host, ns, interf, cl)
