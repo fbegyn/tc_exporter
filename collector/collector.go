@@ -181,12 +181,12 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			for _, qd := range qdiscs {
 				t.logger.Debug("qdisc type", "kind", qd.Kind)
-				t.logger.Debug("passing qdisc to qdisc collector", "qdisc", qd)
 				t.Collectors["qdisc"].CollectObject(ch, host, ns, interf, qd)
 				if qd.XStats == nil {
 					t.logger.Debug("XStats struct is empty for this qdisc", "qdisc", qd, "interface", interf.Attributes.Name)
 					continue
 				}
+				t.logger.Debug("passing qdisc to qdisc collector", "qdisc", qd)
 				switch qd.Kind {
 				case "cbq":
 					t.logger.Debug("passing qdisc to cbq collector", "qdisc", qd)
