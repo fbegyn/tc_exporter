@@ -14,6 +14,7 @@ import (
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/exporter-toolkit/web"
 )
 
 var cli App
@@ -100,6 +101,23 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
 	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
 
+	landingConfig := web.LandingConfig{
+		Name:        "TC (Traffic Control) exporter",
+		Description: "Prometheus TC Exporter",
+		Links: []web.LandingLinks{
+			{
+				Address: "/metrics",
+				Text:    "Metrics",
+			},
+		},
+	}
+	landingPage, err := web.NewLandingPage(landingConfig)
+	if err != nil {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
+	mux.Handle("/", landingPage)
+
 	// Start listening for HTTP connections.
 	slog.Info("starting TC exporter", "listen-address", a.ListenAddres)
 	if err := http.ListenAndServe(a.ListenAddres, mux); err != nil {
@@ -115,7 +133,7 @@ func main() {
 		kong.Description("prometheus exporter for linux traffic control"),
 		kong.UsageOnError(),
 		kong.Vars{
-			"version": "v0.8.0-rc1",
+			"version": "v0.8.2",
 		},
 	)
 
