@@ -181,7 +181,12 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			for _, qd := range qdiscs {
 				t.logger.Debug("qdisc type", "kind", qd.Kind)
-				t.Collectors["qdisc"].CollectObject(ch, host, ns, interf, qd)
+				qcol, found := t.Collectors["qdisc"]
+				if !found {
+					t.logger.Error("qdisc collector is not running")
+					continue
+				}
+				qcol.CollectObject(ch, host, ns, interf, qd)
 				if qd.XStats == nil {
 					t.logger.Debug("XStats struct is empty for this qdisc", "qdisc", qd, "interface", interf.Attributes.Name)
 					continue
@@ -189,74 +194,101 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 				t.logger.Debug("passing qdisc to qdisc collector", "qdisc", qd)
 				switch qd.Kind {
 				case "cbq":
-					if found := t.Collectors["cbq"]; !found {
+					col, found := t.Collectors["cbq"]
+					if !found {
 						t.logger.Error("cbq qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to cbq collector", "qdisc", qd)
-					t.Collectors["cbq"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "choke":
-					if found := t.Collectors["choke"]; !found {
+					col, found := t.Collectors["choke"]
+					if !found {
 						t.logger.Error("choke qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to choke collector", "qdisc", qd)
-					t.Collectors["choke"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "codel":
-					if found := t.Collectors["codel"]; !found {
+					col, found := t.Collectors["codel"]
+					if !found {
 						t.logger.Error("codel qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to codel collector", "qdisc", qd)
-					t.Collectors["codel"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "fq":
-					if found := t.Collectors["fq"]; !found {
+					col, found := t.Collectors["fq"]
+					if !found {
 						t.logger.Error("fq qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to fq collector", "qdisc", qd)
-					t.Collectors["fq"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "fq_codel":
-					if found := t.Collectors["fq_codel"]; !found {
+					col, found := t.Collectors["fq_codel"]
+					if !found {
 						t.logger.Error("fq_codel qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to fq_codel collector", "qdisc", qd)
-					t.Collectors["fq_codel"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "hfsc_qdisc":
-					if found := t.Collectors["hfsc_qdisc"]; !found {
+					col, found := t.Collectors["hfsc_qdisc"]
+					if !found {
 						t.logger.Error("hfsc qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to hfsc collector", "qdisc", qd)
-					t.Collectors["hfsc_qdisc"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "service_curve":
+					col, found := t.Collectors["service_curve"]
+					if !found {
+						t.logger.Error("service_curve qdisc collector is not running")
+						continue
+					}
 					t.logger.Debug("passing qdisc to serivce curve collector", "qdisc", qd)
-					t.Collectors["service_curve"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "htb":
-					if found := t.Collectors["htb"]; !found {
+					col, found := t.Collectors["htb"]
+					if !found {
 						t.logger.Error("htb qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to htb collector", "qdisc", qd)
-					t.Collectors["htb"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "pie":
-					if found := t.Collectors["pie"]; !found {
+					col, found := t.Collectors["pie"]
+					if !found {
 						t.logger.Error("pie qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to pie collector", "qdisc", qd)
-					t.Collectors["pie"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "red":
-					if found := t.Collectors["red"]; !found {
+					col, found := t.Collectors["red"]
+					if !found {
 						t.logger.Error("red qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to red collector", "qdisc", qd)
-					t.Collectors["red"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "sfb":
-					if found := t.Collectors["sfb"]; !found {
+					col, found := t.Collectors["sfb"]
+					if !found {
 						t.logger.Error("sfb qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to sfb collector", "qdisc", qd)
-					t.Collectors["sfb"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "sfq":
-					if found := t.Collectors["sfq"]; !found {
+					col, found := t.Collectors["sfq"]
+					if !found {
 						t.logger.Error("sfq qdisc collector is not running")
+						continue
 					}
 					t.logger.Debug("passing qdisc to sfq collector", "qdisc", qd)
-					t.Collectors["sfq"].CollectObject(ch, host, ns, interf, qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				default:
 					t.logger.Debug("no specific exporter for qdisc", "qdisc", qd)
 				}
@@ -268,7 +300,12 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			}
 			for _, cl := range classes {
 				t.logger.Debug("class type", "kind", cl.Kind)
-				t.Collectors["class"].CollectObject(ch, host, ns, interf, cl)
+				ccol, found := t.Collectors["class"]
+				if !found {
+					t.logger.Error("class collector is not running")
+					continue
+				}
+				ccol.CollectObject(ch, host, ns, interf, cl)
 				if cl.XStats == nil {
 					t.logger.Debug("XStats struct is empty for this class", "class", cl, "interface", interf.Attributes.Name)
 					continue
@@ -276,22 +313,28 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 				t.logger.Debug("passing class to class collector", "class", cl)
 				switch cl.Kind {
 				case "htb":
-					if found := t.Collectors["htb"]; !found {
+					col, found := t.Collectors["htb"]
+					if !found {
 						t.logger.Error("htb class collector is not running")
+						continue
 					}
 					t.logger.Debug("passing class to htb collector", "class", cl)
-					t.Collectors["htb_class"].CollectObject(ch, host, ns, interf, cl)
+					col.CollectObject(ch, host, ns, interf, cl)
 				case "hfsc":
-					if found := t.Collectors["hfsc"]; !found {
+					col, found := t.Collectors["hfsc"]
+					if !found {
 						t.logger.Error("hfsc class collector is not running")
-					}
-					if found := t.Collectors["service_curve"]; !found {
-						t.logger.Error("service_curve class collector is not running")
+						continue
 					}
 					t.logger.Debug("passing class to hfsc collector", "class", cl)
-					t.Collectors["hfsc"].CollectObject(ch, host, ns, interf, cl)
+					col.CollectObject(ch, host, ns, interf, cl)
+					col, found = t.Collectors["service_curve"]
+					if !found {
+						t.logger.Error("service_curve class collector is not running")
+						continue
+					}
 					t.logger.Debug("passing class to hfsc service curve collector", "class", cl)
-					t.Collectors["service_curve"].CollectObject(ch, host, ns, interf, cl)
+					col.CollectObject(ch, host, ns, interf, cl)
 				default:
 					t.logger.Debug("no specific exporter for class", "class", cl)
 				}
