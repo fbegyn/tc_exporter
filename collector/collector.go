@@ -92,6 +92,18 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 					return nil, err
 				}
 				collectors["hfsc_qdisc"] = coll
+			case "hfsc_class":
+				logger.Debug(
+					"registering collector",
+					"collector", "hfsc",
+					"component", "class",
+					"key", "hfsc_class",
+				)
+				coll, err := NewHfscCollector(netns, logger)
+				if err != nil {
+					return nil, err
+				}
+				collectors["hfsc_class"] = coll
 			case "service_curve":
 				logger.Debug(
 					"registering collector",
@@ -105,12 +117,13 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 				}
 				collectors["service_curve"] = coll
 			case "htb":
-				logger.Debug("registering collector", "collector", "htb", "key", "htb")
+				logger.Debug("registering collector", "collector", "htb", "key", "htb_qdisc")
 				coll, err := NewHtbCollector(netns, logger)
 				if err != nil {
 					return nil, err
 				}
-				collectors["htb"] = coll
+				collectors["htb_qdisc"] = coll
+				logger.Debug("registering collector", "collector", "htb", "key", "htb_class")
 				coll, err = NewHtbCollector(netns, logger)
 				if err != nil {
 					return nil, err
@@ -233,7 +246,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 					}
 					t.logger.Debug("passing qdisc to fq_codel collector", "qdisc", qd)
 					col.CollectObject(ch, host, ns, interf, qd)
-				case "hfsc_qdisc":
+				case "hfsc":
 					col, found := t.Collectors["hfsc_qdisc"]
 					if !found {
 						t.logger.Error("hfsc qdisc collector is not running")
@@ -250,7 +263,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 					t.logger.Debug("passing qdisc to serivce curve collector", "qdisc", qd)
 					col.CollectObject(ch, host, ns, interf, qd)
 				case "htb":
-					col, found := t.Collectors["htb"]
+					col, found := t.Collectors["htb_qdisc"]
 					if !found {
 						t.logger.Error("htb qdisc collector is not running")
 						continue
@@ -290,7 +303,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 					t.logger.Debug("passing qdisc to sfq collector", "qdisc", qd)
 					col.CollectObject(ch, host, ns, interf, qd)
 				default:
-					t.logger.Debug("no specific exporter for qdisc", "qdisc", qd)
+					t.logger.Info("no specific exporter for qdisc", "qdisc", qd)
 				}
 			}
 
@@ -313,7 +326,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 				t.logger.Debug("passing class to class collector", "class", cl)
 				switch cl.Kind {
 				case "htb":
-					col, found := t.Collectors["htb"]
+					col, found := t.Collectors["htb_class"]
 					if !found {
 						t.logger.Error("htb class collector is not running")
 						continue
@@ -321,7 +334,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 					t.logger.Debug("passing class to htb collector", "class", cl)
 					col.CollectObject(ch, host, ns, interf, cl)
 				case "hfsc":
-					col, found := t.Collectors["hfsc"]
+					col, found := t.Collectors["hfsc_class"]
 					if !found {
 						t.logger.Error("hfsc class collector is not running")
 						continue
@@ -336,7 +349,6 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 					t.logger.Debug("passing class to hfsc service curve collector", "class", cl)
 					col.CollectObject(ch, host, ns, interf, cl)
 				default:
-					t.logger.Debug("no specific exporter for class", "class", cl)
 				}
 			}
 		}
