@@ -16,7 +16,20 @@ type TcCollector struct {
 	logger     slog.Logger
 	netns      map[string][]rtnetlink.LinkMessage
 	Collectors map[string]ObjectCollector
+	Filters    FilterHolder
 }
+
+type FilterHolder struct {
+	Qdisc []Filter `name:"qdisc"`
+	Class []Filter `name:"class"`
+}
+
+type Filter struct {
+	Kind string `name:"kind"`
+	Parent string `name:"parent"`
+	Handle string `name:"handle"`
+}
+
 
 type ObjectCollector interface {
 	Describe(chan<- *prometheus.Desc)
@@ -24,7 +37,7 @@ type ObjectCollector interface {
 }
 
 // NewTcCollector create a new TcCollector given a network interface
-func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables map[string]bool, logger *slog.Logger) (prometheus.Collector, error) {
+func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables map[string]bool, filters FilterHolder, logger *slog.Logger) (prometheus.Collector, error) {
 	collectors := map[string]ObjectCollector{}
 
 	// Setup Qdisc collector for interface
@@ -165,6 +178,7 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 		logger:     *logger,
 		netns:      netns,
 		Collectors: collectors,
+		Filters: filters,
 	}, nil
 }
 
@@ -192,8 +206,17 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			if err != nil {
 				t.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
+			QDISCS:
 			for _, qd := range qdiscs {
-				t.logger.Debug("qdisc type", "kind", qd.Kind)
+				t.logger.Debug("qdisc type", "kind", qd.Kind, "handle", qd.Handle)
+				for _, f := range t.Filters.Qdisc {
+					kindmatch := qd.Kind == f.Kind && f.Kind != ""
+					parentmatch := FmtHandleStr(qd.Parent) == f.Parent && f.Parent != ""
+					if kindmatch || parentmatch {
+						t.logger.Debug("skipping qdisc, it is in the filter list", "qdisc", qd)
+						continue QDISCS
+					}
+				}
 				qcol, found := t.Collectors["qdisc"]
 				if !found {
 					t.logger.Error("qdisc collector is not running")
@@ -311,8 +334,17 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			if err != nil {
 				t.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
+			CLASSES:
 			for _, cl := range classes {
-				t.logger.Debug("class type", "kind", cl.Kind)
+				t.logger.Debug("class type", "kind", cl.Kind, "classid", cl.Handle)
+				for _, f := range t.Filters.Class {
+					kindmatch := cl.Kind == f.Kind && f.Kind != ""
+					parentmatch := FmtHandleStr(cl.Parent) == f.Parent && f.Parent != ""
+					if kindmatch || parentmatch {
+						t.logger.Debug("skipping class, it is in the filter list", "class", cl)
+						continue CLASSES
+					}
+				}
 				ccol, found := t.Collectors["class"]
 				if !found {
 					t.logger.Error("class collector is not running")
@@ -349,12 +381,10 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 					t.logger.Debug("passing class to hfsc service curve collector", "class", cl)
 					col.CollectObject(ch, host, ns, interf, cl)
 				default:
+					t.logger.Info("no specific exporter for class", "class", cl)
 				}
 			}
 		}
 	}
-	// for _, coll := range t.Collectors {
-	// 	coll.Collect(ch)
-	// }
 	t.logger.Debug("metric scrape complete")
 }

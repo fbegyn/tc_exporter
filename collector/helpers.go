@@ -2,6 +2,7 @@ package tccollector
 
 import (
 	"os"
+	"fmt"
 
 	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
@@ -10,9 +11,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// HandleStr is a simple helper function that cinstruct human readable handles
+// HandleStr is a simple helper function that construct human readable handles
 func HandleStr(handle uint32) (uint32, uint32) {
 	return ((handle & 0xffff0000) >> 16), (handle & 0x0000ffff)
+}
+
+// HandleStr is a simple helper function that construct human readable handles
+func FmtHandleStr(handle uint32) (string) {
+	return fmt.Sprintf("%d:%d", ((handle & 0xffff0000) >> 16), (handle & 0x0000ffff))
 }
 
 // GetNetlinkConn gets a rtnetlink connection for the specified network namespace

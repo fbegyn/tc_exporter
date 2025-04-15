@@ -4,11 +4,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"fmt"
 
 	"net/http/pprof"
 
 	"github.com/alecthomas/kong"
-	kongtoml "github.com/alecthomas/kong-toml"
+	"github.com/spf13/viper"
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,22 +20,20 @@ var cli App
 
 // Config datasructure representing the configuration file
 type Config struct {
-	LogLevel     slog.Level
-	ListenAddres string
 	NetNS        map[string]NS
+	Filters      tcexporter.FilterHolder `mapstructure:"filters"`
 }
 
 // NS holds a type alias so we can use it in the config file
 type NS struct {
-	Interfaces []string `name:"interfaces"`
+	Interfaces []string `name:"interfaces" mapstructure:"interfaces"`
 }
 
 // App holds are the
 type App struct {
-	Config        kong.ConfigFlag `help:"location of the config path" name:"config-file"`
+	Config        string `help:"location of the config path" name:"config-file"`
 	LogLevel      string          `help:"slog based log level" default:"info" name:"log-level"`
 	ListenAddres  string          `help:"address to listen on" default:":9704" name:"listen-address"`
-	NetNS         map[string]NS   `name:"netns"`
 	QdiscEnable   bool            `help:"enable the qdisc collector" negatable:"" default:"true" name:"collector-qdisc"`
 	ClassEnable   bool            `help:"enable the class collector" negatable:"" default:"true" name:"collector-class"`
 	CbqEnable     bool            `help:"enable the cbq collector" negatable:"" default:"false" name:"collector-cbq"`
@@ -50,14 +49,14 @@ type App struct {
 	SfqEnable     bool            `help:"enable the sfq collector" negatable:"" default:"false" name:"collector-sfq"`
 }
 
-func (a *App) Run(logger *slog.Logger) error {
+func (a *App) Run(logger *slog.Logger, cfg Config) error {
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
 
 	// fetch all the interfaces from the configured network namespaces
 	// and store them in a map
 	netns := make(map[string][]rtnetlink.LinkMessage)
-	for ns, sp := range a.NetNS {
+	for ns, sp := range cfg.NetNS {
 		interfaces, err := getInterfacesInNetNS(sp.Interfaces, ns)
 		if err != nil {
 			slog.Error("failed to get interfaces from ns", "err", err, "netns", ns)
@@ -83,7 +82,7 @@ func (a *App) Run(logger *slog.Logger) error {
 	}
 
 	// initialise the collector with the configured subcollectors
-	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, logger)
+	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, cfg.Filters, logger)
 	if err != nil {
 		slog.Error("failed to create TC collector", "err", err.Error())
 		return err
@@ -118,12 +117,6 @@ func main() {
 		kong.Vars{
 			"version": "v0.8.0-rc1",
 		},
-		kong.Configuration(
-			kongtoml.Loader,
-			"/etc/tc_exporter/config.toml",
-			"~/.config/tc_exporter/config.toml",
-			"./config.toml",
-		),
 	)
 
 	var logLevel slog.Level
@@ -143,7 +136,26 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
 
-	err := appCtx.Run(logger)
+	var config Config
+	viper.SetConfigName("config") // name of config file (without extension)
+	viper.SetConfigType("toml") // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/etc/tc-exporter/")   // path to look for the config file in
+	viper.AddConfigPath("$HOME/.tc-exporter")  // call multiple times to add many search paths
+	viper.AddConfigPath(".")               // optionally look for config in the working directory
+	viper.AddConfigPath(cli.Config)
+	err := viper.ReadInConfig() // Find and read the config file
+	if err != nil { // Handle errors reading the config file
+		slog.Error("error reading config file", "err", err, "path", "test")
+		os.Exit(10)
+	}
+	err = viper.Unmarshal(&config)
+	if err != nil { // Handle errors reading the config file
+		slog.Error("error unmarshalling config file", "err", err, "path", "test")
+		os.Exit(11)
+	}
+	fmt.Println(config)
+
+	err = appCtx.Run(logger, config)
 	if err != nil {
 		slog.Error("failed to run kong app", "error", err)
 		os.Exit(2)
