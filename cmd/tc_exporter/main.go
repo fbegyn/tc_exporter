@@ -104,6 +104,7 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 	landingConfig := web.LandingConfig{
 		Name:        "TC (Traffic Control) exporter",
 		Description: "Prometheus TC Exporter",
+		Version: Version,
 		Links: []web.LandingLinks{
 			{
 				Address: "/metrics",
@@ -133,7 +134,7 @@ func main() {
 		kong.Description("prometheus exporter for linux traffic control"),
 		kong.UsageOnError(),
 		kong.Vars{
-			"version": "v0.8.2",
+			"version": Version,
 		},
 	)
 
