@@ -25,11 +25,10 @@ type FilterHolder struct {
 }
 
 type Filter struct {
-	Kind string `name:"kind"`
+	Kind   string `name:"kind"`
 	Parent string `name:"parent"`
 	Handle string `name:"handle"`
 }
-
 
 type ObjectCollector interface {
 	Describe(chan<- *prometheus.Desc)
@@ -93,7 +92,7 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 					return nil, err
 				}
 				collectors["fq_codel"] = coll
-			case "hfsc_qdisc":
+			case "hfsc":
 				logger.Debug(
 					"registering collector",
 					"collector", "hfsc",
@@ -105,14 +104,13 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 					return nil, err
 				}
 				collectors["hfsc_qdisc"] = coll
-			case "hfsc_class":
 				logger.Debug(
 					"registering collector",
 					"collector", "hfsc",
 					"component", "class",
 					"key", "hfsc_class",
 				)
-				coll, err := NewHfscCollector(netns, logger)
+				coll, err = NewHfscCollector(netns, logger)
 				if err != nil {
 					return nil, err
 				}
@@ -178,7 +176,7 @@ func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables m
 		logger:     *logger,
 		netns:      netns,
 		Collectors: collectors,
-		Filters: filters,
+		Filters:    filters,
 	}, nil
 }
 
@@ -206,7 +204,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			if err != nil {
 				t.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
-			QDISCS:
+		QDISCS:
 			for _, qd := range qdiscs {
 				t.logger.Debug("qdisc type", "kind", qd.Kind, "handle", qd.Handle)
 				for _, f := range t.Filters.Qdisc {
@@ -334,7 +332,7 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 			if err != nil {
 				t.logger.Error("failed to get qdiscs", "interface", interf.Attributes.Name, "err", err)
 			}
-			CLASSES:
+		CLASSES:
 			for _, cl := range classes {
 				t.logger.Debug("class type", "kind", cl.Kind, "classid", cl.Handle)
 				for _, f := range t.Filters.Class {

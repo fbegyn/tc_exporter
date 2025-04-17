@@ -1,28 +1,28 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"fmt"
 
 	"net/http/pprof"
 
 	"github.com/alecthomas/kong"
-	"github.com/spf13/viper"
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/exporter-toolkit/web"
+	"github.com/spf13/viper"
 )
 
 var cli App
 
 // Config datasructure representing the configuration file
 type Config struct {
-	NetNS        map[string]NS
-	Filters      tcexporter.FilterHolder `mapstructure:"filters"`
+	NetNS   map[string]NS
+	Filters tcexporter.FilterHolder `mapstructure:"filters"`
 }
 
 // NS holds a type alias so we can use it in the config file
@@ -33,21 +33,21 @@ type NS struct {
 // App holds are the
 type App struct {
 	Config        string `help:"location of the config path" name:"config-file"`
-	LogLevel      string          `help:"slog based log level" default:"info" name:"log-level"`
-	ListenAddres  string          `help:"address to listen on" default:":9704" name:"listen-address"`
-	QdiscEnable   bool            `help:"enable the qdisc collector" negatable:"" default:"true" name:"collector-qdisc"`
-	ClassEnable   bool            `help:"enable the class collector" negatable:"" default:"true" name:"collector-class"`
-	CbqEnable     bool            `help:"enable the cbq collector" negatable:"" default:"false" name:"collector-cbq"`
-	ChokeEnable   bool            `help:"enable the choke collector" negatable:"" default:"false" name:"collector-choke"`
-	CodelEnable   bool            `help:"enable the codel collector" negatable:"" default:"false" name:"collector-codel"`
-	FqEnable      bool            `help:"enable the fq collector" negatable:"" default:"false" name:"collector-fq"`
-	FqcodelEnable bool            `help:"enable the fqcodel collector" negatable:"" default:"false" name:"collector-fqcodel"`
-	HfscEnable    bool            `help:"enable the hfsc collector" negatable:"" default:"false" name:"collector-hfsc"`
-	HtbEnable     bool            `help:"enable the htb collector" negatable:"" default:"false" name:"collector-htb"`
-	PieEnable     bool            `help:"enable the pie collector" negatable:"" default:"false" name:"collector-pie"`
-	RedEnable     bool            `help:"enable the red collector" negatable:"" default:"false" name:"collector-red"`
-	SfbEnable     bool            `help:"enable the sfb collector" negatable:"" default:"false" name:"collector-sfb"`
-	SfqEnable     bool            `help:"enable the sfq collector" negatable:"" default:"false" name:"collector-sfq"`
+	LogLevel      string `help:"slog based log level" default:"info" name:"log-level"`
+	ListenAddres  string `help:"address to listen on" default:":9704" name:"listen-address"`
+	QdiscEnable   bool   `help:"enable the qdisc collector" negatable:"" default:"true" name:"collector-qdisc"`
+	ClassEnable   bool   `help:"enable the class collector" negatable:"" default:"true" name:"collector-class"`
+	CbqEnable     bool   `help:"enable the cbq collector" negatable:"" default:"false" name:"collector-cbq"`
+	ChokeEnable   bool   `help:"enable the choke collector" negatable:"" default:"false" name:"collector-choke"`
+	CodelEnable   bool   `help:"enable the codel collector" negatable:"" default:"false" name:"collector-codel"`
+	FqEnable      bool   `help:"enable the fq collector" negatable:"" default:"false" name:"collector-fq"`
+	FqcodelEnable bool   `help:"enable the fqcodel collector" negatable:"" default:"false" name:"collector-fqcodel"`
+	HfscEnable    bool   `help:"enable the hfsc collector" negatable:"" default:"false" name:"collector-hfsc"`
+	HtbEnable     bool   `help:"enable the htb collector" negatable:"" default:"false" name:"collector-htb"`
+	PieEnable     bool   `help:"enable the pie collector" negatable:"" default:"false" name:"collector-pie"`
+	RedEnable     bool   `help:"enable the red collector" negatable:"" default:"false" name:"collector-red"`
+	SfbEnable     bool   `help:"enable the sfb collector" negatable:"" default:"false" name:"collector-sfb"`
+	SfqEnable     bool   `help:"enable the sfq collector" negatable:"" default:"false" name:"collector-sfq"`
 }
 
 func (a *App) Run(logger *slog.Logger, cfg Config) error {
@@ -73,7 +73,7 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 		"codel":         a.CodelEnable,
 		"fq":            a.FqEnable,
 		"fq_codel":      a.FqcodelEnable,
-		"hfsc_qdisc":    a.HfscEnable,
+		"hfsc":          a.HfscEnable,
 		"service_curve": a.HfscEnable,
 		"htb":           a.HtbEnable,
 		"pie":           a.PieEnable,
@@ -104,7 +104,7 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 	landingConfig := web.LandingConfig{
 		Name:        "TC (Traffic Control) exporter",
 		Description: "Prometheus TC Exporter",
-		Version: Version,
+		Version:     Version,
 		Links: []web.LandingLinks{
 			{
 				Address: "/metrics",
@@ -156,14 +156,14 @@ func main() {
 	slog.SetDefault(logger)
 
 	var config Config
-	viper.SetConfigName("config") // name of config file (without extension)
-	viper.SetConfigType("toml") // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath("/etc/tc-exporter/")   // path to look for the config file in
-	viper.AddConfigPath("$HOME/.tc-exporter")  // call multiple times to add many search paths
-	viper.AddConfigPath(".")               // optionally look for config in the working directory
+	viper.SetConfigName("config")             // name of config file (without extension)
+	viper.SetConfigType("toml")               // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath("/etc/tc-exporter/")  // path to look for the config file in
+	viper.AddConfigPath("$HOME/.tc-exporter") // call multiple times to add many search paths
+	viper.AddConfigPath(".")                  // optionally look for config in the working directory
 	viper.AddConfigPath(cli.Config)
 	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil { // Handle errors reading the config file
+	if err != nil {             // Handle errors reading the config file
 		slog.Error("error reading config file", "err", err, "path", "test")
 		os.Exit(10)
 	}
