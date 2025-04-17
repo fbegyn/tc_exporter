@@ -56,6 +56,7 @@ func TestTcCollector(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 			logger = logger.With("test", "collector")
+			filters := tcexporter.FilterHolder{}
 
 			test := make(map[string][]rtnetlink.LinkMessage)
 			con, _ := tcexporter.GetNetlinkConn("default")
@@ -68,7 +69,7 @@ func TestTcCollector(t *testing.T) {
 			links, _ = con.Link.List()
 			test["testing02"] = links
 
-			coll, err := tcexporter.NewTcCollector(test, enabledCollectors, logger)
+			coll, err := tcexporter.NewTcCollector(test, enabledCollectors, filters, logger)
 			_ = coll
 			if err != nil {
 				t.Fatalf("failed to create TC collector: %v", err)
