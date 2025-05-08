@@ -6,7 +6,7 @@ toolchain go1.23.6
 
 require (
 	github.com/alecthomas/kong v1.10.0
-	github.com/florianl/go-tc v0.4.5
+	github.com/florianl/go-tc v0.4.6-0.20250503080040-d0c05cfe3c86
 	github.com/jsimonetti/rtnetlink v1.4.2
 	github.com/mdlayher/netlink v1.7.2
 	github.com/prometheus/client_golang v1.22.0
