@@ -1,0 +1,22 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "enabledManagers": ["gomod", "nix"],
+    "packageRules":[
+        {
+            "description": "Update on Friday's for weekend review",
+            "matchManagers": ["gomod"],
+            "groupName": "godeps",
+            "schedule": "* 16 * * 5"
+        },
+        {
+            "description": "Update on Friday's for weekend review",
+            "matchManagers": ["nix"],
+            "groupName": "nixdeps",
+            "schedule": "* 16 * * 1"
+        }
+    ],
+    "extends": [
+        "config:recommended",
+        ":rebaseStalePrs"
+    ]
+}
