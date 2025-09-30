@@ -24,21 +24,20 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
         inherit system;
-        config = import ./go.nix;
         overlays = [ devshell.overlays.default ];
       };
     in rec {
       defaultPackage = pkgs.buildGoModule {
         name = "tc_exporter";
         src = ./.;
-        CGO_ENABLED = 0;
+        env.CGO_ENABLED = 0;
         doCheck = false;
         checkPhase = ''
           staticcheck ./cmd/tc_exporter/
           staticcheck ./collector/
           go test -exec sudo ./collector/ -v
         '';
-        vendorHash = "sha256-ZRnfVXV6/QJ98EsgTswxMeIroGfxJ2D436WzCwcVvbU";
+        vendorHash = "sha256-Ldpe/+4HajH3PjbA4eSUA9aeG1stzd5UDLZ2VbG5ADE=";
         ldflags = [
           "-s" "-w"
         ];
@@ -46,7 +45,7 @@
       devShells.default = pkgs.devshell.mkShell rec {
         name = "tc-exporer";
         packages = with pkgs; [
-          go_1_23
+          go_1_24
           gofumpt
           go-tools
           git
