@@ -36,6 +36,10 @@ type FqCollector struct {
 	fastpathPackets     *prometheus.Desc // uint64
 }
 
+func init() {
+	registerCollector("fq", false, NewFqCollector)
+}
+
 // NewFqCollector create a new QdiscCollector given a network interface
 func NewFqCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

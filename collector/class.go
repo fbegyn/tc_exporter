@@ -22,6 +22,10 @@ type ClassCollector struct {
 	stats  stats
 }
 
+func init() {
+	registerCollector("class", true, NewClassCollector)
+}
+
 // NewClassCollector create a new ClassCollector given a network interface
 func NewClassCollector(netns map[string][]rtnetlink.LinkMessage, clog *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for the class collector

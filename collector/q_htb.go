@@ -24,6 +24,11 @@ type HtbCollector struct {
 	tokens  *prometheus.Desc
 }
 
+func init() {
+	registerCollector("htb_qdisc", false, NewHtbCollector)
+	registerCollector("htb_class", false, NewHtbCollector)
+}
+
 // NewHtbCollector create a new QdiscCollector given a network interface
 func NewHtbCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

@@ -45,7 +45,7 @@
       devShells.default = pkgs.devshell.mkShell rec {
         name = "tc-exporer";
         packages = with pkgs; [
-          go_1_24
+          go_1_25
           gofumpt
           go-tools
           git

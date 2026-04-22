@@ -29,6 +29,10 @@ type SfbCollector struct {
 	queueDrop   *prometheus.Desc
 }
 
+func init() {
+	registerCollector("sfb", false, NewSfbCollector)
+}
+
 // NewSfbCollector create a new QdiscCollector given a network interface
 func NewSfbCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

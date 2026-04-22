@@ -8,7 +8,7 @@ import (
 
 	"net/http/pprof"
 
-	"github.com/alecthomas/kong"
+	"github.com/alecthomas/kingpin/v2"
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,8 +16,6 @@ import (
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/spf13/viper"
 )
-
-var cli App
 
 // Config datasructure representing the configuration file
 type Config struct {
@@ -30,27 +28,14 @@ type NS struct {
 	Interfaces []string `name:"interfaces" mapstructure:"interfaces"`
 }
 
-// App holds are the
-type App struct {
-	Config        string `help:"location of the config path" name:"config-file"`
-	LogLevel      string `help:"slog based log level" default:"info" name:"log-level"`
-	ListenAddres  string `help:"address to listen on" default:":9704" name:"listen-address"`
-	QdiscEnable   bool   `help:"enable the qdisc collector" negatable:"" default:"true" name:"collector-qdisc"`
-	ClassEnable   bool   `help:"enable the class collector" negatable:"" default:"true" name:"collector-class"`
-	CbqEnable     bool   `help:"enable the cbq collector" negatable:"" default:"false" name:"collector-cbq"`
-	ChokeEnable   bool   `help:"enable the choke collector" negatable:"" default:"false" name:"collector-choke"`
-	CodelEnable   bool   `help:"enable the codel collector" negatable:"" default:"false" name:"collector-codel"`
-	FqEnable      bool   `help:"enable the fq collector" negatable:"" default:"false" name:"collector-fq"`
-	FqcodelEnable bool   `help:"enable the fqcodel collector" negatable:"" default:"false" name:"collector-fqcodel"`
-	HfscEnable    bool   `help:"enable the hfsc collector" negatable:"" default:"false" name:"collector-hfsc"`
-	HtbEnable     bool   `help:"enable the htb collector" negatable:"" default:"false" name:"collector-htb"`
-	PieEnable     bool   `help:"enable the pie collector" negatable:"" default:"false" name:"collector-pie"`
-	RedEnable     bool   `help:"enable the red collector" negatable:"" default:"false" name:"collector-red"`
-	SfbEnable     bool   `help:"enable the sfb collector" negatable:"" default:"false" name:"collector-sfb"`
-	SfqEnable     bool   `help:"enable the sfq collector" negatable:"" default:"false" name:"collector-sfq"`
-}
+var (
+	configFile      = kingpin.Flag("config-file", "location of the config path").Default("").String()
+	logLevel        = kingpin.Flag("log-level", "slog based log level").Default("info").String()
+	listenAddress   = kingpin.Flag("listen-address", "address to listen on").Default(":9704").String()
+	disableDefaults = kingpin.Flag("collector.disable-defaults", "Set all collectors to disabled by default.").Default("false").Bool()
+)
 
-func (a *App) Run(logger *slog.Logger, cfg Config) error {
+func run(logger *slog.Logger, cfg Config) error {
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
 
@@ -65,25 +50,8 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 		netns[ns] = interfaces
 	}
 
-	enabledCollectors := map[string]bool{
-		"qdisc":         a.QdiscEnable,
-		"class":         a.ClassEnable,
-		"cbq":           a.CbqEnable,
-		"choke":         a.ChokeEnable,
-		"codel":         a.CodelEnable,
-		"fq":            a.FqEnable,
-		"fq_codel":      a.FqcodelEnable,
-		"hfsc":          a.HfscEnable,
-		"service_curve": a.HfscEnable,
-		"htb":           a.HtbEnable,
-		"pie":           a.PieEnable,
-		"red":           a.RedEnable,
-		"sfb":           a.SfbEnable,
-		"sfq":           a.SfqEnable,
-	}
-
 	// initialise the collector with the configured subcollectors
-	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, cfg.Filters, logger)
+	collector, err := tcexporter.NewTcCollector(netns, cfg.Filters, logger)
 	if err != nil {
 		slog.Error("failed to create TC collector", "err", err.Error())
 		return err
@@ -120,8 +88,8 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 	mux.Handle("/", landingPage)
 
 	// Start listening for HTTP connections.
-	slog.Info("starting TC exporter", "listen-address", a.ListenAddres)
-	if err := http.ListenAndServe(a.ListenAddres, mux); err != nil {
+	slog.Info("starting TC exporter", "listen-address", *listenAddress)
+	if err := http.ListenAndServe(*listenAddress, mux); err != nil {
 		slog.Error("cannot start TC exporter", "err", err.Error())
 	}
 	return nil
@@ -129,30 +97,31 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 
 func main() {
 	// CLI arguments parsing
-	appCtx := kong.Parse(&cli,
-		kong.Name("tc-exporter"),
-		kong.Description("prometheus exporter for linux traffic control"),
-		kong.UsageOnError(),
-		kong.Vars{
-			"version": Version,
-		},
-	)
+	kingpin.CommandLine.Name = "tc-exporter"
+	kingpin.CommandLine.Help = "prometheus exporter for linux traffic control"
+	kingpin.HelpFlag.Short('h')
+	kingpin.Version(Version)
+	kingpin.Parse()
 
-	var logLevel slog.Level
-	switch cli.LogLevel {
-	case "info":
-		logLevel = slog.LevelInfo
-	case "error":
-		logLevel = slog.LevelError
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "debug":
-		logLevel = slog.LevelDebug
-	default:
-		logLevel = slog.LevelInfo
+	if *disableDefaults {
+		tcexporter.DisableDefaultCollectors()
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	var slogLevel slog.Level
+	switch *logLevel {
+	case "info":
+		slogLevel = slog.LevelInfo
+	case "error":
+		slogLevel = slog.LevelError
+	case "warn":
+		slogLevel = slog.LevelWarn
+	case "debug":
+		slogLevel = slog.LevelDebug
+	default:
+		slogLevel = slog.LevelInfo
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel}))
 	slog.SetDefault(logger)
 
 	var config Config
@@ -161,7 +130,9 @@ func main() {
 	viper.AddConfigPath("/etc/tc-exporter/")  // path to look for the config file in
 	viper.AddConfigPath("$HOME/.tc-exporter") // call multiple times to add many search paths
 	viper.AddConfigPath(".")                  // optionally look for config in the working directory
-	viper.AddConfigPath(cli.Config)
+	if *configFile != "" {
+		viper.AddConfigPath(*configFile)
+	}
 	err := viper.ReadInConfig() // Find and read the config file
 	if err != nil {             // Handle errors reading the config file
 		slog.Error("error reading config file", "err", err, "path", "test")
@@ -174,9 +145,8 @@ func main() {
 	}
 	fmt.Println(config)
 
-	err = appCtx.Run(logger, config)
-	if err != nil {
-		slog.Error("failed to run kong app", "error", err)
+	if err := run(logger, config); err != nil {
+		slog.Error("failed to run tc exporter", "error", err)
 		os.Exit(2)
 	}
 }

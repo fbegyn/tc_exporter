@@ -24,6 +24,10 @@ type RedCollector struct {
 	pDrop  *prometheus.Desc
 }
 
+func init() {
+	registerCollector("red", false, NewRedCollector)
+}
+
 // NewRedCollector create a new QdiscCollector given a network interface
 func NewRedCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

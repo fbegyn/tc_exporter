@@ -1,15 +1,56 @@
 package tccollector
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/florianl/go-tc"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 const namespace = "tc"
+
+// Factory builds an ObjectCollector for the given netns map and logger.
+type Factory func(netns map[string][]rtnetlink.LinkMessage, logger *slog.Logger) (ObjectCollector, error)
+
+var (
+	factories        = map[string]Factory{}
+	collectorState   = map[string]*bool{}
+	forcedCollectors = map[string]bool{}
+)
+
+// registerCollector wires a collector into the registry: it defines the
+// --collector.<name> kingpin flag, records whether the user explicitly set the
+// flag (via the action), and stores the factory for later instantiation.
+func registerCollector(name string, isDefaultEnabled bool, factory Factory) {
+	helpDefault := "disabled"
+	if isDefaultEnabled {
+		helpDefault = "enabled"
+	}
+	flag := kingpin.Flag(
+		fmt.Sprintf("collector.%s", name),
+		fmt.Sprintf("Enable the %s collector (default: %s).", name, helpDefault),
+	).Default(fmt.Sprintf("%v", isDefaultEnabled)).
+		Action(func(*kingpin.ParseContext) error {
+			forcedCollectors[name] = true
+			return nil
+		}).Bool()
+	collectorState[name] = flag
+	factories[name] = factory
+}
+
+// DisableDefaultCollectors flips every collector flag to false unless the user
+// explicitly set it on the command line.
+func DisableDefaultCollectors() {
+	for name, st := range collectorState {
+		if _, forced := forcedCollectors[name]; !forced {
+			*st = false
+		}
+	}
+}
 
 // TcCollector is the object that will collect TC data for the interface
 type TcCollector struct {
@@ -35,141 +76,21 @@ type ObjectCollector interface {
 	CollectObject(ch chan<- prometheus.Metric, hostname, ns string, interf rtnetlink.LinkMessage, qd tc.Object)
 }
 
-// NewTcCollector create a new TcCollector given a network interface
-func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, collectorEnables map[string]bool, filters FilterHolder, logger *slog.Logger) (prometheus.Collector, error) {
+// NewTcCollector creates a TcCollector with every collector whose kingpin flag
+// is currently true. Call kingpin.Parse (and DisableDefaultCollectors if
+// applicable) before calling this.
+func NewTcCollector(netns map[string][]rtnetlink.LinkMessage, filters FilterHolder, logger *slog.Logger) (prometheus.Collector, error) {
 	collectors := map[string]ObjectCollector{}
-
-	// Setup Qdisc collector for interface
-	qColl, err := NewQdiscCollector(netns, logger)
-	if err != nil {
-		return nil, err
-	}
-	collectors["qdisc"] = qColl
-	// Setup Class collector for interface
-	cColl, err := NewClassCollector(netns, logger)
-	if err != nil {
-		return nil, err
-	}
-	collectors["class"] = cColl
-
-	// add additional collectors
-	for collector, enabled := range collectorEnables {
-		if enabled {
-			switch collector {
-			case "cbq":
-				logger.Debug("registering collector", "collector", "cbq", "key", "cbq")
-				coll, err := NewCbqCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["cbq"] = coll
-			case "choke":
-				logger.Debug("registering collector", "collector", "choke", "key", "choke")
-				coll, err := NewChokeCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["choke"] = coll
-			case "codel":
-				logger.Debug("registering collector", "collector", "codel", "key", "codel")
-				coll, err := NewCodelCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["codel"] = coll
-			case "fq":
-				logger.Debug("registering collector", "collector", "fq", "key", "fq")
-				coll, err := NewFqCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["fq"] = coll
-			case "fq_codel":
-
-				logger.Debug("registering collector", "collector", "fq_codel", "key", "fq_codel")
-				coll, err := NewFqCodelQdiscCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["fq_codel"] = coll
-			case "hfsc":
-				logger.Debug(
-					"registering collector",
-					"collector", "hfsc",
-					"component", "qdisc",
-					"key", "hfsc_qdisc",
-				)
-				coll, err := NewHfscCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["hfsc_qdisc"] = coll
-				logger.Debug(
-					"registering collector",
-					"collector", "hfsc",
-					"component", "class",
-					"key", "hfsc_class",
-				)
-				coll, err = NewHfscCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["hfsc_class"] = coll
-			case "service_curve":
-				logger.Debug(
-					"registering collector",
-					"collector", "hfsc",
-					"component", "service curve",
-					"key", "service_curve",
-				)
-				coll, err := NewServiceCurveCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["service_curve"] = coll
-			case "htb":
-				logger.Debug("registering collector", "collector", "htb", "key", "htb_qdisc")
-				coll, err := NewHtbCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["htb_qdisc"] = coll
-				logger.Debug("registering collector", "collector", "htb", "key", "htb_class")
-				coll, err = NewHtbCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["htb_class"] = coll
-			case "pie":
-				logger.Debug("registering collector", "collector", "pie", "key", "pie")
-				coll, err := NewPieCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["pie"] = coll
-			case "red":
-				logger.Debug("registering collector", "collector", "red", "key", "red")
-				coll, err := NewRedCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["red"] = coll
-			case "sfb":
-				logger.Debug("registering collector", "collector", "sfb", "key", "sfb")
-				coll, err := NewSfbCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["sfb"] = coll
-			case "sfq":
-				logger.Debug("registering collector", "collector", "sfq", "key", "sfq")
-				coll, err := NewSfqCollector(netns, logger)
-				if err != nil {
-					return nil, err
-				}
-				collectors["sfq"] = coll
-			}
+	for name, enabled := range collectorState {
+		if !*enabled {
+			continue
 		}
+		logger.Debug("registering collector", "collector", name)
+		c, err := factories[name](netns, logger)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't init collector %s: %w", name, err)
+		}
+		collectors[name] = c
 	}
 
 	return &TcCollector{

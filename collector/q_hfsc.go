@@ -25,6 +25,12 @@ type HfscCollector struct {
 	work   *prometheus.Desc
 }
 
+func init() {
+	registerCollector("hfsc_qdisc", false, NewHfscCollector)
+	registerCollector("hfsc_class", false, NewHfscCollector)
+	registerCollector("service_curve", false, NewServiceCurveCollector)
+}
+
 // NewHfscCollector create a new QdiscCollector given a network interface
 func NewHfscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

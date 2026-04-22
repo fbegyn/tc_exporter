@@ -23,6 +23,10 @@ type CbqCollector struct {
 	undertime   *prometheus.Desc
 }
 
+func init() {
+	registerCollector("cbq", false, NewCbqCollector)
+}
+
 // NewCbqCollector create a new QdiscCollector given a network interface
 func NewCbqCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector
