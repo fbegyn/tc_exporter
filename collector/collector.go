@@ -52,6 +52,24 @@ func DisableDefaultCollectors() {
 	}
 }
 
+// ApplyCollectorConfig overrides collector enable/disable state from values
+// supplied by the config file. CLI-explicit flags (tracked in forcedCollectors)
+// take precedence and are never overridden. Unknown collector names produce a
+// WARN log and are skipped, so config typos don't silently disable a feature.
+func ApplyCollectorConfig(cfg map[string]bool, logger *slog.Logger) {
+	for name, enabled := range cfg {
+		if _, forced := forcedCollectors[name]; forced {
+			continue
+		}
+		state, ok := collectorState[name]
+		if !ok {
+			logger.Warn("unknown collector in [collector] config section", "name", name)
+			continue
+		}
+		*state = enabled
+	}
+}
+
 // TcCollector is the object that will collect TC data for the interface
 type TcCollector struct {
 	logger     slog.Logger
