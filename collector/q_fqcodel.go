@@ -28,6 +28,10 @@ type FqCodelQdiscCollector struct {
 	oldFlowsLen    *prometheus.Desc
 }
 
+func init() {
+	registerCollector("fq_codel", false, NewFqCodelQdiscCollector)
+}
+
 // NewFqCodelQdiscCollector create a new QdiscCollector given a network interface
 func NewFqCodelQdiscCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

@@ -21,6 +21,10 @@ type SfqCollector struct {
 	allot *prometheus.Desc
 }
 
+func init() {
+	registerCollector("sfq", false, NewSfqCollector)
+}
+
 // NewSfqCollector create a new QdiscCollector given a network interface
 func NewSfqCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

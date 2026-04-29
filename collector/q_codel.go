@@ -28,6 +28,10 @@ type CodelCollector struct {
 	maxPacket     *prometheus.Desc
 }
 
+func init() {
+	registerCollector("codel", false, NewCodelCollector)
+}
+
 // NewCodelCollector create a new QdiscCollector given a network interface
 func NewCodelCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

@@ -6,3 +6,9 @@ interfaces = ['enp12s0','dummy01']
 
 [netns.testing]
 interfaces = ['dummy02']
+
+[collector]
+disable-defaults = false
+fq_codel = true
+htb_qdisc = true
+htb_class = true

@@ -28,6 +28,10 @@ type PieCollector struct {
 	prob      *prometheus.Desc
 }
 
+func init() {
+	registerCollector("pie", false, NewPieCollector)
+}
+
 // NewPieCollector create a new QdiscCollector given a network interface
 func NewPieCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

@@ -30,21 +30,6 @@ func TestTcCollector(t *testing.T) {
 	defer rtnl1.Close()
 	defer rtnl2.Close()
 
-	enabledCollectors := map[string]bool{
-		"cbq": true,
-	        "choke": true,
-	        "codel": true,
-	        "fq": true,
-	        "fq_codel": true,
-	        "hfsc_qdisc": true,
-	        "service_curve": true,
-	        "htb": true,
-	        "pie": true,
-	        "red": true,
-	        "sfb": true,
-	        "sfq": true,
-	}
-
 	tests := []struct {
 		name    string
 		devices []string
@@ -69,7 +54,7 @@ func TestTcCollector(t *testing.T) {
 			links, _ = con.Link.List()
 			test["testing02"] = links
 
-			coll, err := tcexporter.NewTcCollector(test, enabledCollectors, filters, logger)
+			coll, err := tcexporter.NewTcCollector(test, filters, logger)
 			_ = coll
 			if err != nil {
 				t.Fatalf("failed to create TC collector: %v", err)

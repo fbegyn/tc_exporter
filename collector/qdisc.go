@@ -20,6 +20,10 @@ type QdiscCollector struct {
 	stats  stats
 }
 
+func init() {
+	registerCollector("qdisc", true, NewQdiscCollector)
+}
+
 // NewQdiscCollector create a new QdiscCollector given a network interface
 func NewQdiscCollector(netns map[string][]rtnetlink.LinkMessage, qlog *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

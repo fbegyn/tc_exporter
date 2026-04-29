@@ -24,6 +24,10 @@ type ChokeCollector struct {
 	pDrop   *prometheus.Desc
 }
 
+func init() {
+	registerCollector("choke", false, NewChokeCollector)
+}
+
 // NewChokeCollector create a new QdiscCollector given a network interface
 func NewChokeCollector(netns map[string][]rtnetlink.LinkMessage, log *slog.Logger) (ObjectCollector, error) {
 	// Setup logger for qdisc collector

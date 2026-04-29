@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"net/http/pprof"
 
-	"github.com/alecthomas/kong"
+	"github.com/alecthomas/kingpin/v2"
 	tcexporter "github.com/fbegyn/tc_exporter/collector"
 	"github.com/jsimonetti/rtnetlink"
 	"github.com/prometheus/client_golang/prometheus"
@@ -17,12 +16,13 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cli App
-
 // Config datasructure representing the configuration file
 type Config struct {
-	NetNS   map[string]NS
-	Filters tcexporter.FilterHolder `mapstructure:"filters"`
+	ListenAddress string                  `mapstructure:"listen-address"`
+	LogLevel      string                  `mapstructure:"log-level"`
+	NetNS         map[string]NS           `mapstructure:"netns"`
+	Filters       tcexporter.FilterHolder `mapstructure:"filters"`
+	Collector     map[string]bool         `mapstructure:"collector"`
 }
 
 // NS holds a type alias so we can use it in the config file
@@ -30,27 +30,25 @@ type NS struct {
 	Interfaces []string `name:"interfaces" mapstructure:"interfaces"`
 }
 
-// App holds are the
-type App struct {
-	Config        string `help:"location of the config path" name:"config-file"`
-	LogLevel      string `help:"slog based log level" default:"info" name:"log-level"`
-	ListenAddres  string `help:"address to listen on" default:":9704" name:"listen-address"`
-	QdiscEnable   bool   `help:"enable the qdisc collector" negatable:"" default:"true" name:"collector-qdisc"`
-	ClassEnable   bool   `help:"enable the class collector" negatable:"" default:"true" name:"collector-class"`
-	CbqEnable     bool   `help:"enable the cbq collector" negatable:"" default:"false" name:"collector-cbq"`
-	ChokeEnable   bool   `help:"enable the choke collector" negatable:"" default:"false" name:"collector-choke"`
-	CodelEnable   bool   `help:"enable the codel collector" negatable:"" default:"false" name:"collector-codel"`
-	FqEnable      bool   `help:"enable the fq collector" negatable:"" default:"false" name:"collector-fq"`
-	FqcodelEnable bool   `help:"enable the fqcodel collector" negatable:"" default:"false" name:"collector-fqcodel"`
-	HfscEnable    bool   `help:"enable the hfsc collector" negatable:"" default:"false" name:"collector-hfsc"`
-	HtbEnable     bool   `help:"enable the htb collector" negatable:"" default:"false" name:"collector-htb"`
-	PieEnable     bool   `help:"enable the pie collector" negatable:"" default:"false" name:"collector-pie"`
-	RedEnable     bool   `help:"enable the red collector" negatable:"" default:"false" name:"collector-red"`
-	SfbEnable     bool   `help:"enable the sfb collector" negatable:"" default:"false" name:"collector-sfb"`
-	SfqEnable     bool   `help:"enable the sfq collector" negatable:"" default:"false" name:"collector-sfq"`
+// explicitFlags records non-collector flags the user passed on the CLI, so we
+// know to ignore the equivalent config-file values for those keys.
+var explicitFlags = map[string]bool{}
+
+func markExplicit(name string) kingpin.Action {
+	return func(*kingpin.ParseContext) error {
+		explicitFlags[name] = true
+		return nil
+	}
 }
 
-func (a *App) Run(logger *slog.Logger, cfg Config) error {
+var (
+	configFile      = kingpin.Flag("config-file", "location of the config path").Default("").String()
+	logLevel        = kingpin.Flag("log-level", "slog based log level").Default("info").Action(markExplicit("log-level")).String()
+	listenAddress   = kingpin.Flag("listen-address", "address to listen on").Default(":9704").Action(markExplicit("listen-address")).String()
+	disableDefaults = kingpin.Flag("collector.disable-defaults", "Set all collectors to disabled by default.").Default("false").Action(markExplicit("collector.disable-defaults")).Bool()
+)
+
+func run(logger *slog.Logger, cfg Config, listen string) error {
 	// registering application information
 	prometheus.MustRegister(NewVersionCollector("tc_exporter"))
 
@@ -65,25 +63,8 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 		netns[ns] = interfaces
 	}
 
-	enabledCollectors := map[string]bool{
-		"qdisc":         a.QdiscEnable,
-		"class":         a.ClassEnable,
-		"cbq":           a.CbqEnable,
-		"choke":         a.ChokeEnable,
-		"codel":         a.CodelEnable,
-		"fq":            a.FqEnable,
-		"fq_codel":      a.FqcodelEnable,
-		"hfsc":          a.HfscEnable,
-		"service_curve": a.HfscEnable,
-		"htb":           a.HtbEnable,
-		"pie":           a.PieEnable,
-		"red":           a.RedEnable,
-		"sfb":           a.SfbEnable,
-		"sfq":           a.SfqEnable,
-	}
-
 	// initialise the collector with the configured subcollectors
-	collector, err := tcexporter.NewTcCollector(netns, enabledCollectors, cfg.Filters, logger)
+	collector, err := tcexporter.NewTcCollector(netns, cfg.Filters, logger)
 	if err != nil {
 		slog.Error("failed to create TC collector", "err", err.Error())
 		return err
@@ -120,8 +101,8 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 	mux.Handle("/", landingPage)
 
 	// Start listening for HTTP connections.
-	slog.Info("starting TC exporter", "listen-address", a.ListenAddres)
-	if err := http.ListenAndServe(a.ListenAddres, mux); err != nil {
+	slog.Info("starting TC exporter", "listen-address", listen)
+	if err := http.ListenAndServe(listen, mux); err != nil {
 		slog.Error("cannot start TC exporter", "err", err.Error())
 	}
 	return nil
@@ -129,54 +110,76 @@ func (a *App) Run(logger *slog.Logger, cfg Config) error {
 
 func main() {
 	// CLI arguments parsing
-	appCtx := kong.Parse(&cli,
-		kong.Name("tc-exporter"),
-		kong.Description("prometheus exporter for linux traffic control"),
-		kong.UsageOnError(),
-		kong.Vars{
-			"version": Version,
-		},
-	)
+	kingpin.CommandLine.Name = "tc-exporter"
+	kingpin.CommandLine.Help = "prometheus exporter for linux traffic control"
+	kingpin.HelpFlag.Short('h')
+	kingpin.Version(Version)
+	kingpin.Parse()
 
-	var logLevel slog.Level
-	switch cli.LogLevel {
-	case "info":
-		logLevel = slog.LevelInfo
-	case "error":
-		logLevel = slog.LevelError
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "debug":
-		logLevel = slog.LevelDebug
-	default:
-		logLevel = slog.LevelInfo
-	}
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
-	slog.SetDefault(logger)
-
+	// Read config first so its values can feed into logger setup and collector
+	// state. CLI flags (already parsed) win over config; we track explicitness
+	// via explicitFlags / forcedCollectors.
 	var config Config
 	viper.SetConfigName("config")             // name of config file (without extension)
 	viper.SetConfigType("toml")               // REQUIRED if the config file does not have the extension in the name
 	viper.AddConfigPath("/etc/tc-exporter/")  // path to look for the config file in
 	viper.AddConfigPath("$HOME/.tc-exporter") // call multiple times to add many search paths
 	viper.AddConfigPath(".")                  // optionally look for config in the working directory
-	viper.AddConfigPath(cli.Config)
-	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil {             // Handle errors reading the config file
-		slog.Error("error reading config file", "err", err, "path", "test")
+	if *configFile != "" {
+		viper.AddConfigPath(*configFile)
+	}
+	if err := viper.ReadInConfig(); err != nil {
+		slog.Error("error reading config file", "err", err)
 		os.Exit(10)
 	}
-	err = viper.Unmarshal(&config)
-	if err != nil { // Handle errors reading the config file
-		slog.Error("error unmarshalling config file", "err", err, "path", "test")
+	if err := viper.Unmarshal(&config); err != nil {
+		slog.Error("error unmarshalling config file", "err", err)
 		os.Exit(11)
 	}
-	fmt.Println(config)
 
-	err = appCtx.Run(logger, config)
-	if err != nil {
-		slog.Error("failed to run kong app", "error", err)
+	// Resolve log level: CLI explicit > config file > default ("info").
+	level := *logLevel
+	if !explicitFlags["log-level"] && config.LogLevel != "" {
+		level = config.LogLevel
+	}
+	var slogLevel slog.Level
+	switch level {
+	case "info":
+		slogLevel = slog.LevelInfo
+	case "error":
+		slogLevel = slog.LevelError
+	case "warn":
+		slogLevel = slog.LevelWarn
+	case "debug":
+		slogLevel = slog.LevelDebug
+	default:
+		slogLevel = slog.LevelInfo
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel}))
+	slog.SetDefault(logger)
+
+	// Resolve collector configuration. disable-defaults is a reserved key in
+	// the [collector] section; CLI flag wins over config.
+	disable := *disableDefaults
+	if !explicitFlags["collector.disable-defaults"] {
+		if v, ok := config.Collector["disable-defaults"]; ok {
+			disable = v
+		}
+	}
+	delete(config.Collector, "disable-defaults")
+	if disable {
+		tcexporter.DisableDefaultCollectors()
+	}
+	tcexporter.ApplyCollectorConfig(config.Collector, logger)
+
+	// Resolve listen address: CLI explicit > config file > default.
+	listen := *listenAddress
+	if !explicitFlags["listen-address"] && config.ListenAddress != "" {
+		listen = config.ListenAddress
+	}
+
+	if err := run(logger, config, listen); err != nil {
+		slog.Error("failed to run tc exporter", "error", err)
 		os.Exit(2)
 	}
 }
