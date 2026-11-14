@@ -20,7 +20,7 @@ structure and keys
 * `[collector]`: enable or disable individual collectors by name. Keys use the
   same names as the equivalent `--collector.<name>` CLI flags
   (e.g. `qdisc`, `class`, `fq_codel`, `htb_qdisc`, `htb_class`, `hfsc_qdisc`,
-  `hfsc_class`, `service_curve`, `cbq`, `choke`, `codel`, `fq`, `pie`, `red`,
+  `hfsc_class`, `service_curve`, `cake`, `cbq`, `choke`, `codel`, `fq`, `pie`, `red`,
   `sfb`, `sfq`).
   * `disable-defaults`: when true, disables every collector that isn't
     explicitly enabled (equivalent to `--collector.disable-defaults`).

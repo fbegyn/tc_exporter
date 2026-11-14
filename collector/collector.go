@@ -166,6 +166,14 @@ func (t TcCollector) Collect(ch chan<- prometheus.Metric) {
 				}
 				t.logger.Debug("passing qdisc to qdisc collector", "qdisc", qd)
 				switch qd.Kind {
+				case "cake":
+					col, found := t.Collectors["cake"]
+					if !found {
+						t.logger.Error("cake qdisc collector is not running")
+						continue
+					}
+					t.logger.Debug("passing qdisc to cake collector", "qdisc", qd)
+					col.CollectObject(ch, host, ns, interf, qd)
 				case "cbq":
 					col, found := t.Collectors["cbq"]
 					if !found {
