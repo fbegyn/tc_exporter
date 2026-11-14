@@ -12,6 +12,7 @@ var (
 	Version   string
 	Revision  string
 	Branch    string
+	Date      string
 	GoVersion = runtime.Version()
 )
 

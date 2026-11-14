@@ -9,7 +9,9 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
 builds:
-  - goos:
+  - env:
+      - CGO_ENABLED=0
+    goos:
       - linux
     goarch:
       - amd64
@@ -26,6 +28,8 @@ builds:
 archives:
   - id: arch
     formats: ["tar.gz", "zip", "binary"]
+release:
+  prerelease: auto
 checksum:
   name_template: 'checksums.txt'
 snapshot:

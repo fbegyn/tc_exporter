@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - 'main'
+  pull_request:
+  workflow_call:
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   test-collector:
@@ -18,7 +19,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.24
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
 
       - name: Test collector
         run: go test -v -exec sudo ./collector/
